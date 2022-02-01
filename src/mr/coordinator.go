@@ -19,8 +19,6 @@ type Coordinator struct {
 	reduceSet map[int]bool //Collection of undone reduce tasks, if false, not allocated, if true, allocated
 
 	lock sync.Mutex
-
-	taskChan chan CoordinatorReply
 }
 
 // Your code here -- RPC handlers for the worker to call.
@@ -75,7 +73,6 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c.mapSet = make(map[int]bool)
 	//fmt.Printf("nMap: %v, nReduce: %v \n", len(files), nReduce)
 	c.lock = sync.Mutex{}
-	c.taskChan = make(chan CoordinatorReply)
 	for i := 0; i < len(files); i++ {
 		c.mapSet[i] = false
 	}

@@ -29,7 +29,7 @@ type WorkerArgs struct {
 }
 
 type CoordinatorReply struct {
-	TaskType int //0 for map, 1 for reduce, 2 done
+	TaskType int //0 for map, 1 for reduce, 2 for wait, 3 done
 
 	NMap    int //Number of map tasks
 	NReduce int //Number of reduce tasks
