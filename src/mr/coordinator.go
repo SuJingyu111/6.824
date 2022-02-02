@@ -1,8 +1,10 @@
 package mr
 
 import (
+	"fmt"
 	"log"
 	"sync"
+	"time"
 )
 import "net"
 import "os"
@@ -22,6 +24,92 @@ type Coordinator struct {
 }
 
 // Your code here -- RPC handlers for the worker to call.
+
+func (c *Coordinator) RequestAndReport(args *WorkerArgs, reply *CoordinatorReply) error {
+	c.lock.Lock()
+	if args.FinishedMapIdx >= 0 {
+		_, ok := c.mapSet[args.FinishedMapIdx]
+		if ok {
+			delete(c.mapSet, args.FinishedMapIdx)
+		}
+		return nil
+	}
+	if args.FinishedReduceIdx >= 0 {
+		_, ok := c.reduceSet[args.FinishedReduceIdx]
+		if ok {
+			delete(c.reduceSet, args.FinishedReduceIdx)
+		}
+		return nil
+	}
+	if len(c.reduceSet) == 0 {
+		reply.TaskType = 3
+		c.lock.Unlock()
+	} else if len(c.mapSet) > 0 { // Allocate map task
+		allocateIdx := -1
+		//Find map tasks not yet allocated
+		for key, val := range c.mapSet {
+			if !val {
+				allocateIdx = key
+				break
+			}
+		}
+		if allocateIdx == -1 {
+			reply.TaskType = 2 //wait until all maps finish
+			c.lock.Unlock()
+		} else {
+			reply.TaskType = 0 //map
+			reply.NMap = c.nMap
+			reply.NReduce = c.nReduce
+			reply.MapIdx = allocateIdx
+			reply.FileName = c.files[allocateIdx]
+			c.mapSet[allocateIdx] = true
+			c.lock.Unlock()
+			//check if worker crashed
+			go func() {
+				time.Sleep(10 * time.Second)
+				c.lock.Lock()
+				_, ifContain := c.mapSet[allocateIdx]
+				if ifContain {
+					fmt.Printf("Coordinator: Assume worker crashed in map for %d.\n", allocateIdx)
+					c.mapSet[allocateIdx] = false
+				}
+				c.lock.Unlock()
+			}()
+		}
+	} else {
+		allocateIdx := -1
+		for key, val := range c.reduceSet {
+			if !val {
+				allocateIdx = key
+				break
+			}
+		}
+		if allocateIdx == -1 {
+			reply.TaskType = 2
+			fmt.Printf("Coordinator: worker wait for reduce to finish\n")
+			c.lock.Unlock()
+		} else {
+			reply.TaskType = 1 //Reduce
+			reply.NMap = c.nMap
+			reply.NReduce = c.nReduce
+			reply.ReduceIdx = allocateIdx
+			fmt.Printf("Coordinator: Allocated reduce task %d.\n", allocateIdx)
+			c.reduceSet[allocateIdx] = true
+			c.lock.Unlock()
+			go func() {
+				time.Sleep(10 * time.Second)
+				c.lock.Lock()
+				_, ifContain := c.reduceSet[allocateIdx]
+				if ifContain {
+					fmt.Printf("Coordinator: Assume worker crashed in reduce.\n")
+					c.reduceSet[allocateIdx] = false
+				}
+				c.lock.Unlock()
+			}()
+		}
+	}
+	return nil
+}
 
 //
 // an example RPC handler.
