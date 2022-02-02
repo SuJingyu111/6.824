@@ -197,7 +197,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				cReply = CoordinatorReply{}
 			}
 		}
-		time.Sleep(time.Second)
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 

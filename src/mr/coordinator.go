@@ -1,7 +1,6 @@
 package mr
 
 import (
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -68,7 +67,7 @@ func (c *Coordinator) RequestAndReport(args *WorkerArgs, reply *CoordinatorReply
 				c.lock.Lock()
 				_, ifContain := c.mapSet[allocateIdx]
 				if ifContain {
-					fmt.Printf("Coordinator: Assume worker crashed in map for %d.\n", allocateIdx)
+					//fmt.Printf("Coordinator: Assume worker crashed in map for %d.\n", allocateIdx)
 					c.mapSet[allocateIdx] = false
 				}
 				c.lock.Unlock()
@@ -84,20 +83,20 @@ func (c *Coordinator) RequestAndReport(args *WorkerArgs, reply *CoordinatorReply
 		}
 		if allocateIdx == -1 {
 			reply.TaskType = 2
-			fmt.Printf("Coordinator: worker wait for reduce to finish\n")
+			//fmt.Printf("Coordinator: worker wait for reduce to finish\n")
 		} else {
 			reply.TaskType = 1 //Reduce
 			reply.NMap = c.nMap
 			reply.NReduce = c.nReduce
 			reply.ReduceIdx = allocateIdx
-			fmt.Printf("Coordinator: Allocated reduce task %d.\n", allocateIdx)
+			//fmt.Printf("Coordinator: Allocated reduce task %d.\n", allocateIdx)
 			c.reduceSet[allocateIdx] = true
 			go func() {
 				time.Sleep(10 * time.Second)
 				c.lock.Lock()
 				_, ifContain := c.reduceSet[allocateIdx]
 				if ifContain {
-					fmt.Printf("Coordinator: Assume worker crashed in reduce.\n")
+					//fmt.Printf("Coordinator: Assume worker crashed in reduce.\n")
 					c.reduceSet[allocateIdx] = false
 				}
 				c.lock.Unlock()
