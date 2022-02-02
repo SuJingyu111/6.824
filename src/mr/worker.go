@@ -88,7 +88,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				//Write each bucket into intermediate file
 				for reduceIdx, bucket := range buckets {
 					tempFileName := "mr-" + strconv.Itoa(cReply.MapIdx) + "-" + strconv.Itoa(reduceIdx)
-					tempFile, err := ioutil.TempFile(".", tempFileName)
+					tempFile, err := ioutil.TempFile("", tempFileName)
 					if err != nil {
 						log.Fatalf("cannot create %v", tempFileName)
 					}
@@ -150,7 +150,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				sort.Sort(ByKey(intermediate))
 				//create output file
 				fileName := "mr-out-" + strconv.Itoa(reduceIdx)
-				file, err := ioutil.TempFile(".", fileName)
+				file, err := ioutil.TempFile("", fileName)
 				if err != nil {
 					log.Fatalf("cannot open output %v", fileName)
 				}

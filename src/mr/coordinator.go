@@ -142,7 +142,9 @@ func (c *Coordinator) server() {
 // if the entire job has finished.
 //
 func (c *Coordinator) Done() bool {
+	c.lock.Lock()
 	ret := len(c.reduceSet) == 0
+	c.lock.Unlock()
 	return ret
 }
 
