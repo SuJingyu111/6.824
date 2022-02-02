@@ -27,6 +27,7 @@ type Coordinator struct {
 
 func (c *Coordinator) RequestAndReport(args *WorkerArgs, reply *CoordinatorReply) error {
 	c.lock.Lock()
+	defer c.lock.Unlock()
 	if args.FinishedMapIdx >= 0 {
 		_, ok := c.mapSet[args.FinishedMapIdx]
 		if ok {
@@ -43,7 +44,6 @@ func (c *Coordinator) RequestAndReport(args *WorkerArgs, reply *CoordinatorReply
 	}
 	if len(c.reduceSet) == 0 {
 		reply.TaskType = 3
-		c.lock.Unlock()
 	} else if len(c.mapSet) > 0 { // Allocate map task
 		allocateIdx := -1
 		//Find map tasks not yet allocated
@@ -55,7 +55,6 @@ func (c *Coordinator) RequestAndReport(args *WorkerArgs, reply *CoordinatorReply
 		}
 		if allocateIdx == -1 {
 			reply.TaskType = 2 //wait until all maps finish
-			c.lock.Unlock()
 		} else {
 			reply.TaskType = 0 //map
 			reply.NMap = c.nMap
@@ -63,7 +62,6 @@ func (c *Coordinator) RequestAndReport(args *WorkerArgs, reply *CoordinatorReply
 			reply.MapIdx = allocateIdx
 			reply.FileName = c.files[allocateIdx]
 			c.mapSet[allocateIdx] = true
-			c.lock.Unlock()
 			//check if worker crashed
 			go func() {
 				time.Sleep(10 * time.Second)
@@ -87,7 +85,6 @@ func (c *Coordinator) RequestAndReport(args *WorkerArgs, reply *CoordinatorReply
 		if allocateIdx == -1 {
 			reply.TaskType = 2
 			fmt.Printf("Coordinator: worker wait for reduce to finish\n")
-			c.lock.Unlock()
 		} else {
 			reply.TaskType = 1 //Reduce
 			reply.NMap = c.nMap
@@ -95,7 +92,6 @@ func (c *Coordinator) RequestAndReport(args *WorkerArgs, reply *CoordinatorReply
 			reply.ReduceIdx = allocateIdx
 			fmt.Printf("Coordinator: Allocated reduce task %d.\n", allocateIdx)
 			c.reduceSet[allocateIdx] = true
-			c.lock.Unlock()
 			go func() {
 				time.Sleep(10 * time.Second)
 				c.lock.Lock()
