@@ -20,14 +20,13 @@ package raft
 import (
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"6.824/labrpc"
 )
 
 // import "bytes"
 // import "6.824/labgob"
-
-
 
 //
 // as each Raft peer becomes aware that successive log entries are
@@ -52,7 +51,13 @@ type ApplyMsg struct {
 	SnapshotIndex int
 }
 
-//
+// LogEtry An entry in the log
+type LogEtry struct {
+	Term    int
+	Command interface{}
+}
+
+// Raft
 // A Go object implementing a single Raft peer.
 //
 type Raft struct {
@@ -66,6 +71,22 @@ type Raft struct {
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
 
+	//Persistent states
+	currentTerm int
+	votedFor    int
+	log         []LogEtry
+
+	//Volatile states on all servers
+	commitIndex     int
+	lastApplied     int
+	applyCh         chan ApplyMsg
+	serverState     int
+	timeStamp       time.Time
+	electionTimeOut time.Duration
+
+	//Volatile states on leaders
+	nextIndex  []int
+	matchIndex []int
 }
 
 // return currentTerm and whether this server
@@ -94,7 +115,6 @@ func (rf *Raft) persist() {
 	// rf.persister.SaveRaftState(data)
 }
 
-
 //
 // restore previously persisted state.
 //
@@ -117,7 +137,6 @@ func (rf *Raft) readPersist(data []byte) {
 	// }
 }
 
-
 //
 // A service wants to switch to snapshot.  Only do so if Raft hasn't
 // have more recent info since it communicate the snapshot on applyCh.
@@ -137,7 +156,6 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (2D).
 
 }
-
 
 //
 // example RequestVote RPC arguments structure.
@@ -196,7 +214,6 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	return ok
 }
 
-
 //
 // the service using Raft (e.g. a k/v server) wants to start
 // agreement on the next command to be appended to Raft's log. if this
@@ -217,7 +234,6 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	isLeader := true
 
 	// Your code here (2B).
-
 
 	return index, term, isLeader
 }
@@ -280,7 +296,6 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// start ticker goroutine to start elections
 	go rf.ticker()
-
 
 	return rf
 }
