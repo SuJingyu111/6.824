@@ -101,9 +101,13 @@ type Raft struct {
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
 
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
 	var term int
 	var isleader bool
 	// Your code here (2A).
+	term = rf.currentTerm
+	isleader = rf.serverState == LEADER
 	return term, isleader
 }
 
@@ -171,6 +175,10 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 //
 type RequestVoteArgs struct {
 	// Your data here (2A, 2B).
+	Term         int
+	CandidateId  int
+	LastLogIndex int
+	LastLogTerm  int
 }
 
 //
@@ -179,6 +187,8 @@ type RequestVoteArgs struct {
 //
 type RequestVoteReply struct {
 	// Your data here (2A).
+	Term        int
+	VoteGranted bool
 }
 
 //
