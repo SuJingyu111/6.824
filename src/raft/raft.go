@@ -57,6 +57,14 @@ type LogEtry struct {
 	Command interface{}
 }
 
+//Constants
+const (
+	CANDIDATE int = 1
+	LEADER    int = 2
+	FOLLOWER  int = 0
+)
+const HaveNotVoted int = -1
+
 // Raft
 // A Go object implementing a single Raft peer.
 //
