@@ -64,7 +64,13 @@ const (
 	LEADER    int = 2
 	FOLLOWER  int = 0
 )
+
 const HaveNotVoted int = -1
+
+const (
+	ElectionTimeBase         int = 500
+	ElectionTimeRandInterval int = 200
+)
 
 //
 // A Go object implementing a single Raft peer.
@@ -408,7 +414,7 @@ func (rf *Raft) tick() {
 //Reset the time stamp and election time out
 func (rf *Raft) resetTimeAndTimeOut() {
 	rf.timeStamp = time.Now()
-	rf.electionTimeOut = time.Millisecond * time.Duration(700+rand.Intn(300))
+	rf.electionTimeOut = time.Millisecond * time.Duration(ElectionTimeBase+rand.Intn(ElectionTimeRandInterval))
 }
 
 //Send heartBeat
@@ -433,7 +439,7 @@ func (rf *Raft) sendHeartBeat() {
 func (rf *Raft) startElection() {
 	rf.currentTerm += 1
 	rf.serverState = CANDIDATE
-	DPrintf("server %v start election on new term %v", rf.me, rf.currentTerm)
+	//DPrintf("server %v start election on new term %v", rf.me, rf.currentTerm)
 	rf.votedFor = rf.me
 
 	//var wg sync.WaitGroup
@@ -482,7 +488,7 @@ func (rf *Raft) newTerm(newTerm int) {
 }
 
 func (rf *Raft) elected() {
-	DPrintf("server %v elected in term %v", rf.me, rf.currentTerm)
+	//DPrintf("server %v elected in term %v", rf.me, rf.currentTerm)
 	rf.serverState = LEADER
 	for idx := range rf.nextIndex {
 		rf.nextIndex[idx] = len(rf.log)
