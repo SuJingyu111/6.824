@@ -64,13 +64,7 @@ const (
 	LEADER    int = 2
 	FOLLOWER  int = 0
 )
-
 const HaveNotVoted int = -1
-
-const (
-	ElectionTimeBase         int = 500
-	ElectionTimeRandInterval int = 200
-)
 
 //
 // A Go object implementing a single Raft peer.
@@ -102,10 +96,6 @@ type Raft struct {
 	//Volatile states on leaders
 	nextIndex  []int
 	matchIndex []int
-
-	//My extra fields
-	electionCond     *sync.Cond
-	electionFinished *bool
 }
 
 // return currentTerm and whether this server
@@ -260,18 +250,16 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 // that the caller passes the address of the reply struct with &, not
 // the struct itself.
 //
-//func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bool {
-func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int, electionSuccess *bool) bool {
+func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bool {
 	//defer wg.Done()
 	reply := &RequestVoteReply{}
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
 	if ok {
 		//electionMu.Lock()
 		//defer electionMu.Unlock()
-		//rf.mu.Lock()
-		//defer rf.mu.Unlock()
-		rf.electionCond.L.Lock()
-		defer rf.electionCond.L.Unlock()
+		rf.mu.Lock()
+		defer rf.mu.Unlock()
+
 		if reply.Term > rf.currentTerm {
 			rf.newTerm(reply.Term)
 		}
@@ -279,9 +267,8 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int, el
 		if reply.Term == rf.currentTerm && reply.VoteGranted {
 			*vote++
 			if *vote > len(rf.peers)/2 && rf.currentTerm == args.Term {
-				*electionSuccess = true
-				*rf.electionFinished = true
-				rf.electionCond.Broadcast()
+				rf.elected()
+				rf.sendHeartBeat()
 			}
 		}
 	}
@@ -421,7 +408,7 @@ func (rf *Raft) tick() {
 //Reset the time stamp and election time out
 func (rf *Raft) resetTimeAndTimeOut() {
 	rf.timeStamp = time.Now()
-	rf.electionTimeOut = time.Millisecond * time.Duration(ElectionTimeBase+rand.Intn(ElectionTimeRandInterval))
+	rf.electionTimeOut = time.Millisecond * time.Duration(700+rand.Intn(300))
 }
 
 //Send heartBeat
@@ -446,9 +433,8 @@ func (rf *Raft) sendHeartBeat() {
 func (rf *Raft) startElection() {
 	rf.currentTerm += 1
 	rf.serverState = CANDIDATE
-	//DPrintf("server %v start election on new term %v", rf.me, rf.currentTerm)
+	DPrintf("server %v start election on new term %v", rf.me, rf.currentTerm)
 	rf.votedFor = rf.me
-	*rf.electionFinished = false
 
 	//var wg sync.WaitGroup
 	lastLogTerm := 0
@@ -465,29 +451,15 @@ func (rf *Raft) startElection() {
 	vote := 1
 	//term := rf.currentTerm
 	//electionMu := sync.Mutex{}
-	electionSuccess := false
 
 	for peer := range rf.peers {
 		server := peer
 		if server != rf.me {
 			//wg.Add(1)
 			//go rf.sendRequestVote(server, &args, &vote, &wg, &term, &electionMu)
-			//go rf.sendRequestVote(server, &args, &vote)
-			go rf.sendRequestVote(server, &args, &vote, &electionSuccess)
+			go rf.sendRequestVote(server, &args, &vote)
 		}
 	}
-
-	for !*rf.electionFinished {
-		rf.electionCond.Wait()
-	}
-
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-	if electionSuccess {
-		rf.elected()
-		rf.sendHeartBeat()
-	}
-
 	//wg.Wait()
 	/*
 		if rf.currentTerm < term {
@@ -507,13 +479,10 @@ func (rf *Raft) newTerm(newTerm int) {
 	rf.currentTerm = newTerm
 	rf.votedFor = HaveNotVoted
 	rf.serverState = FOLLOWER
-
-	*rf.electionFinished = true
-	rf.electionCond.Broadcast()
 }
 
 func (rf *Raft) elected() {
-	//DPrintf("server %v elected in term %v", rf.me, rf.currentTerm)
+	DPrintf("server %v elected in term %v", rf.me, rf.currentTerm)
 	rf.serverState = LEADER
 	for idx := range rf.nextIndex {
 		rf.nextIndex[idx] = len(rf.log)
@@ -555,11 +524,6 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	//Volatile states on leaders
 	rf.nextIndex = make([]int, len(peers))
 	rf.matchIndex = make([]int, len(peers))
-
-	//My extra fields
-	rf.electionCond = sync.NewCond(&rf.mu)
-	temp := true
-	rf.electionFinished = &temp
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
