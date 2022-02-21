@@ -260,6 +260,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bo
 	//defer wg.Done()
 	reply := &RequestVoteReply{}
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
+	DPrintf(" server %v Sent vote request to server %v", rf.me, server)
 	if ok {
 		//electionMu.Lock()
 		//defer electionMu.Unlock()
@@ -392,7 +393,7 @@ func (rf *Raft) ticker() {
 		// be started and to randomize sleeping time using
 		// time.Sleep().
 		rf.tick()
-		sleepTime := 50
+		sleepTime := rand.Intn(40) + 30
 		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 	}
 }
@@ -424,7 +425,7 @@ func (rf *Raft) sendHeartBeat() {
 		LeaderId:    rf.me,
 		IsHeartBeat: true,
 	}
-
+	//rf.electionCond.L.Unlock()
 	for i := range rf.peers {
 		server := i
 		if server != rf.me {
@@ -439,7 +440,7 @@ func (rf *Raft) sendHeartBeat() {
 func (rf *Raft) startElection() {
 	rf.currentTerm += 1
 	rf.serverState = CANDIDATE
-	//DPrintf("server %v start election on new term %v", rf.me, rf.currentTerm)
+	DPrintf("server %v start election on new term %v", rf.me, rf.currentTerm)
 	rf.votedFor = rf.me
 
 	//var wg sync.WaitGroup
@@ -453,7 +454,7 @@ func (rf *Raft) startElection() {
 		LastLogIndex: len(rf.log) - 1,
 		LastLogTerm:  lastLogTerm,
 	}
-
+	//rf.electionCond.L.Lock()
 	vote := 1
 	//term := rf.currentTerm
 	//electionMu := sync.Mutex{}
