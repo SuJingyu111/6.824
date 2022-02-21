@@ -18,7 +18,6 @@ package raft
 //
 
 import (
-	"fmt"
 	"math/rand"
 	//	"bytes"
 	"sync"
@@ -262,8 +261,6 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bo
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
 	DPrintf(" server %v Sent vote request to server %v", rf.me, server)
 	if ok {
-		//electionMu.Lock()
-		//defer electionMu.Unlock()
 		rf.mu.Lock()
 		defer rf.mu.Unlock()
 
@@ -282,63 +279,6 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bo
 	return ok
 }
 
-//Argument for append entry rpcs
-type AppendEntryArgs struct {
-	Term         int
-	LeaderId     int
-	PrevLogIndex int
-
-	PrevLogTerm int
-	Entries     []LogEtry
-
-	LeaderCommit int
-
-	IsHeartBeat bool
-}
-
-type AppendEntryReply struct {
-	Term    int
-	Success bool
-}
-
-func (rf *Raft) sendAppendEntry(server int, args *AppendEntryArgs, reply *AppendEntryReply) bool {
-	ok := rf.peers[server].Call("Raft.AppendEntry", args, reply)
-	return ok
-}
-
-func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	//For heartbeat msg
-	if args.IsHeartBeat && args.Term >= rf.currentTerm {
-		//If this server is a leader or candidate, then it should become follower
-		if rf.serverState == LEADER {
-			if args.Term > rf.currentTerm {
-				rf.newTerm(args.Term)
-			} else {
-				_, err := DPrintf("Server %v and server %v are both leaders in Term %v", rf.me, args.LeaderId, args.Term)
-				if err != nil {
-					fmt.Printf("Problem in Dprintf")
-				}
-				//fmt.Printf("%v")
-			}
-		} else if rf.serverState == CANDIDATE {
-			rf.serverState = FOLLOWER
-		}
-		//If heartbeat Term is larger than current Term, update Term
-		if args.Term > rf.currentTerm {
-			rf.newTerm(args.Term)
-		}
-		//Reset election timeout, leader is alive
-		rf.resetTimeAndTimeOut()
-		//Send reply
-		reply.Term = args.Term
-		reply.Success = true
-	}
-	//TODO: 2B APPEND
-}
-
 //
 // the service using Raft (e.g. a k/v server) wants to start
 // agreement on the next command to be appended to Raft's log. if this
@@ -354,11 +294,24 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 // the leader.
 //
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
 	index := -1
 	term := -1
 	isLeader := rf.serverState == LEADER
 
 	// Your code here (2B).
+	if !isLeader || rf.killed() {
+		return index, term, isLeader
+	}
+	//Append log to own log list
+	index = len(rf.log)
+	term = rf.currentTerm
+	newEntry := LogEtry{
+		Term:    term,
+		Command: command,
+	}
+	rf.log = append(rf.log, newEntry)
 
 	return index, term, isLeader
 }
@@ -421,9 +374,9 @@ func (rf *Raft) resetTimeAndTimeOut() {
 //Send heartBeat
 func (rf *Raft) sendHeartBeat() {
 	args := AppendEntryArgs{
-		Term:        rf.currentTerm,
-		LeaderId:    rf.me,
-		IsHeartBeat: true,
+		Term:     rf.currentTerm,
+		LeaderId: rf.me,
+		//IsHeartBeat: true,
 	}
 	//rf.electionCond.L.Unlock()
 	for i := range rf.peers {
@@ -432,7 +385,6 @@ func (rf *Raft) sendHeartBeat() {
 			reply := AppendEntryReply{}
 			go rf.sendAppendEntry(server, &args, &reply)
 		}
-		//TODO LIKELY PROBLEM HERE
 	}
 }
 
@@ -454,31 +406,14 @@ func (rf *Raft) startElection() {
 		LastLogIndex: len(rf.log) - 1,
 		LastLogTerm:  lastLogTerm,
 	}
-	//rf.electionCond.L.Lock()
 	vote := 1
-	//term := rf.currentTerm
-	//electionMu := sync.Mutex{}
 
 	for peer := range rf.peers {
 		server := peer
 		if server != rf.me {
-			//wg.Add(1)
-			//go rf.sendRequestVote(server, &args, &vote, &wg, &term, &electionMu)
 			go rf.sendRequestVote(server, &args, &vote)
 		}
 	}
-	//wg.Wait()
-	/*
-		if rf.currentTerm < term {
-			rf.newTerm(term)
-		} else if vote > len(rf.log)/2 {
-			rf.elected()
-			rf.sendHeartBeat()
-		} else {
-			DPrintf("server %v not elected in term %v", rf.me, rf.currentTerm)
-		}
-
-	*/
 }
 
 //Start of a new Term
@@ -492,7 +427,7 @@ func (rf *Raft) elected() {
 	//DPrintf("server %v elected in term %v", rf.me, rf.currentTerm)
 	rf.serverState = LEADER
 	for idx := range rf.nextIndex {
-		rf.nextIndex[idx] = len(rf.log)
+		rf.nextIndex[idx] = len(rf.log) + 1
 	}
 }
 
@@ -537,6 +472,9 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// start ticker goroutine to start elections
 	go rf.ticker()
+
+	// start runner goroutine to append, commit and apply logs
+	go rf.replicateAndCommitHandler()
 
 	return rf
 }
