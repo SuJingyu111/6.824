@@ -259,11 +259,10 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bo
 	//defer wg.Done()
 	reply := &RequestVoteReply{}
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
-	DPrintf(" server %v Sent vote request to server %v", rf.me, server)
 	if ok {
 		rf.mu.Lock()
 		defer rf.mu.Unlock()
-
+		DPrintf(" server %v Sent vote request to server %v", rf.me, server)
 		if reply.Term > rf.currentTerm {
 			rf.newTerm(reply.Term)
 		}
@@ -273,6 +272,9 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bo
 			if *vote > len(rf.peers)/2 && rf.currentTerm == args.Term {
 				rf.elected()
 				rf.sendHeartBeat()
+				// start goroutines to append, commit and apply logs
+				go rf.replicateHandler()
+				go rf.commitHandler()
 			}
 		}
 	}
@@ -299,6 +301,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	index := -1
 	term := -1
 	isLeader := rf.serverState == LEADER
+	DPrintf("Server %v received command from client", rf.me)
 
 	// Your code here (2B).
 	if !isLeader || rf.killed() {
@@ -377,6 +380,7 @@ func (rf *Raft) sendHeartBeat() {
 		Term:     rf.currentTerm,
 		LeaderId: rf.me,
 		//IsHeartBeat: true,
+		Entries: nil,
 	}
 	//rf.electionCond.L.Unlock()
 	for i := range rf.peers {
@@ -472,9 +476,6 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// start ticker goroutine to start elections
 	go rf.ticker()
-
-	// start runner goroutine to append, commit and apply logs
-	go rf.replicateAndCommitHandler()
 
 	return rf
 }
