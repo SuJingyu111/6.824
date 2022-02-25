@@ -96,7 +96,7 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 		} else {
 			rf.log = rf.log[:args.PrevLogIndex+1]
 			rf.log = append(rf.log, args.Entries...)
-			//rf.persist()
+			rf.persist()
 			DPrintf("APP_ENTRY: Server %v append entries, current log length: %v", rf.me, len(rf.log))
 			//DPrintf("Log content: %v", rf.log)
 			reply.Term = rf.currentTerm

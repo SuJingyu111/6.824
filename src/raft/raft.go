@@ -18,6 +18,8 @@ package raft
 //
 
 import (
+	"6.824/labgob"
+	"bytes"
 	"math/rand"
 	//	"bytes"
 	"sync"
@@ -130,15 +132,13 @@ func (rf *Raft) persist() {
 	// e.Encode(rf.yyy)
 	// data := w.Bytes()
 	// rf.persister.SaveRaftState(data)
-	/*
-		w := new(bytes.Buffer)
-		e := labgob.NewEncoder(w)
-		e.Encode(rf.currentTerm)
-		e.Encode(rf.votedFor)
-		e.Encode(rf.log)
-		data := w.Bytes()
-		rf.persister.SaveRaftState(data)
-	*/
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	e.Encode(rf.currentTerm)
+	e.Encode(rf.votedFor)
+	e.Encode(rf.log)
+	data := w.Bytes()
+	rf.persister.SaveRaftState(data)
 }
 
 //
@@ -161,21 +161,19 @@ func (rf *Raft) readPersist(data []byte) {
 	//   rf.xxx = xxx
 	//   rf.yyy = yyy
 	// }
-	/*
-		r := bytes.NewBuffer(data)
-		d := labgob.NewDecoder(r)
-		var currentTerm int
-		var voterdFor int
-		var persistLog []LogEtry
-		if d.Decode(&currentTerm) != nil ||
-			d.Decode(&voterdFor) != nil || d.Decode(&persistLog) != nil {
-			DPrintf("read persist went wrong!")
-		} else {
-			rf.currentTerm = currentTerm
-			rf.votedFor = voterdFor
-			rf.log = persistLog
-		}
-	*/
+	r := bytes.NewBuffer(data)
+	d := labgob.NewDecoder(r)
+	var currentTerm int
+	var voterdFor int
+	var persistLog []LogEtry
+	if d.Decode(&currentTerm) != nil ||
+		d.Decode(&voterdFor) != nil || d.Decode(&persistLog) != nil {
+		DPrintf("read persist went wrong!")
+	} else {
+		rf.currentTerm = currentTerm
+		rf.votedFor = voterdFor
+		rf.log = persistLog
+	}
 }
 
 //
@@ -346,7 +344,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		Command: command,
 	}
 	rf.log = append(rf.log, newEntry)
-	//rf.persist()
+	rf.persist()
 	rf.matchIndex[rf.me] = len(rf.log) - 1
 	DPrintf("START: Leader %v received command from client, log length: %v", rf.me, len(rf.log))
 	//DPrintf("Log content: %v", rf.log)
@@ -445,7 +443,7 @@ func (rf *Raft) startElection() {
 	rf.serverState = CANDIDATE
 	DPrintf("ELECTION: server %v start election on new term %v", rf.me, rf.currentTerm)
 	rf.votedFor = rf.me
-	//rf.persist()
+	rf.persist()
 	lastLogTerm := 0
 	if len(rf.log) > 0 {
 		lastLogTerm = rf.log[len(rf.log)-1].Term
@@ -471,7 +469,7 @@ func (rf *Raft) newTerm(newTerm int) {
 	rf.currentTerm = newTerm
 	rf.votedFor = HaveNotVoted
 	rf.serverState = FOLLOWER
-	//rf.persist()
+	rf.persist()
 }
 
 func (rf *Raft) elected() {
