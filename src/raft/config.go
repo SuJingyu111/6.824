@@ -158,11 +158,12 @@ func (cfg *config) checkConsistency(server int, index int, logEntry logEntry) {
 func (cfg *config) apply(server int, m ApplyMsg) {
 	cfg.mu.Lock()
 	defer cfg.mu.Unlock()
-
+	DPrintf("CONFIG---: Server %v has log: %v", server, cfg.logs[server])
 	if m.CommandIndex != cfg.nextIndex[server] {
 		log.Fatalf("server %d applied index %d but expected %d",
 			server, m.CommandIndex, cfg.nextIndex[server])
 	}
+	//DPrintf("CONFIG---: Server %v has log: %v", server, cfg.logs[server])
 	cfg.nextIndex[server]++
 
 	logEntry := logEntry{m.CommandValid, m.Command}
