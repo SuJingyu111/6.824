@@ -177,26 +177,6 @@ func (rf *Raft) readPersist(data []byte) {
 }
 
 //
-// A service wants to switch to snapshot.  Only do so if Raft hasn't
-// have more recent info since it communicate the snapshot on applyCh.
-//
-func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int, snapshot []byte) bool {
-
-	// Your code here (2D).
-
-	return true
-}
-
-// the service says it has created a snapshot that has
-// all info up to and including index. this means the
-// service no longer needs the log through (and including)
-// that index. Raft should now trim its log as much as possible.
-func (rf *Raft) Snapshot(index int, snapshot []byte) {
-	// Your code here (2D).
-
-}
-
-//
 // example RequestVote RPC arguments structure.
 // field names must start with capital letters!
 //
@@ -245,7 +225,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	if rf.currentTerm <= args.Term && candidateEligible && (rf.votedFor == HaveNotVoted || rf.votedFor == args.CandidateId) {
 		rf.votedFor = args.CandidateId
-		//rf.persist()
+		rf.persist() //TODO PROBLEM MIGHT BE HERE
 		reply.VoteGranted = true
 		DPrintf("RQVOTE: server %v voted for server %v in term %v",
 			rf.me, args.CandidateId, args.Term)
