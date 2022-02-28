@@ -57,6 +57,7 @@ type ApplyMsg struct {
 type LogEtry struct {
 	Term    int
 	Command interface{}
+	Index   int
 }
 
 //Constants
@@ -103,6 +104,10 @@ type Raft struct {
 	//Volatile states on leaders
 	nextIndex  []int
 	matchIndex []int
+
+	//2D last log info. Persisted for recovery
+	lastLogIndexNotIncluded int
+	lastLogTermNotIncluded  int
 }
 
 // return currentTerm and whether this server
@@ -137,6 +142,8 @@ func (rf *Raft) persist() {
 	e.Encode(rf.currentTerm)
 	e.Encode(rf.votedFor)
 	e.Encode(rf.log)
+	e.Encode(rf.lastLogIndexNotIncluded)
+	e.Encode(rf.lastLogTermNotIncluded)
 	data := w.Bytes()
 	rf.persister.SaveRaftState(data)
 }
@@ -166,13 +173,17 @@ func (rf *Raft) readPersist(data []byte) {
 	var currentTerm int
 	var voterdFor int
 	var persistLog []LogEtry
+	var lastLogIndexNotIncluded int
+	var lastLogTermNotIncluded int
 	if d.Decode(&currentTerm) != nil ||
-		d.Decode(&voterdFor) != nil || d.Decode(&persistLog) != nil {
+		d.Decode(&voterdFor) != nil || d.Decode(&persistLog) != nil || d.Decode(&lastLogIndexNotIncluded) != nil || d.Decode(&lastLogTermNotIncluded) != nil {
 		DPrintf("read persist went wrong!")
 	} else {
 		rf.currentTerm = currentTerm
 		rf.votedFor = voterdFor
 		rf.log = persistLog
+		rf.lastLogTermNotIncluded = lastLogTermNotIncluded
+		rf.lastLogIndexNotIncluded = lastLogIndexNotIncluded
 	}
 }
 
@@ -198,6 +209,22 @@ type RequestVoteReply struct {
 	VoteGranted bool
 }
 
+//This is not locked! Check lock in outer scope!
+func (rf *Raft) getLastLogIndex() int {
+	if len(rf.log) == 0 {
+		return rf.lastLogIndexNotIncluded
+	}
+	return rf.log[len(rf.log)-1].Index
+}
+
+//This is not locked! Check lock in outer scope!
+func (rf *Raft) getLastLogTerm() int {
+	if len(rf.log) == 0 {
+		return rf.lastLogTermNotIncluded
+	}
+	return rf.log[len(rf.log)-1].Term
+}
+
 //
 // example RequestVote RPC handler.
 //
@@ -211,13 +238,11 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		DPrintf("RQVOTE: Leader %v receives higher term rqvote RPC. Turns follower", rf.me)
 	}
 
-	lastLogTerm := 0
-	if len(rf.log) > 0 {
-		lastLogTerm = rf.log[len(rf.log)-1].Term
-	}
+	lastLogTerm := rf.getLastLogTerm()
+	lastLogIndex := rf.getLastLogIndex()
 
 	candidateEligible := (lastLogTerm < args.LastLogTerm) ||
-		(lastLogTerm == args.LastLogTerm && len(rf.log)-1 <= args.LastLogIndex)
+		(lastLogTerm == args.LastLogTerm && lastLogIndex <= args.LastLogIndex)
 	DPrintf("RQVOTE: server %v receive rqvote rpc from server %v in term %v, eligible: %v",
 		rf.me, args.CandidateId, args.Term, candidateEligible)
 	//DPrintf("last log Term: %v, args.Term: %v, this log length: %v, args log index: args.LastLogIndex: %v",
@@ -225,7 +250,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	if rf.currentTerm <= args.Term && candidateEligible && (rf.votedFor == HaveNotVoted || rf.votedFor == args.CandidateId) {
 		rf.votedFor = args.CandidateId
-		rf.persist() //TODO PROBLEM MIGHT BE HERE
+		rf.persist()
 		reply.VoteGranted = true
 		DPrintf("RQVOTE: server %v voted for server %v in term %v",
 			rf.me, args.CandidateId, args.Term)
@@ -282,7 +307,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bo
 		if reply.Term == rf.currentTerm && reply.VoteGranted {
 			*vote++
 			if *vote > len(rf.peers)/2 && rf.currentTerm == args.Term && rf.serverState == CANDIDATE {
-				DPrintf("SD_RQ_VOTE: candidate %v is now leader, log length: %v-----------------------", rf.me, len(rf.log))
+				DPrintf("SD_RQ_VOTE: candidate %v is now leader, log length: %v-----------------------", rf.me, rf.getLastLogIndex()+1)
 				rf.elected()
 				rf.sendHeartBeat()
 			}
@@ -317,16 +342,17 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		return index, term, isLeader
 	}
 	//Append log to own log list
-	index = len(rf.log)
+	index = rf.getLastLogIndex() + 1
 	term = rf.currentTerm
 	newEntry := LogEtry{
 		Term:    term,
 		Command: command,
+		Index:   index,
 	}
 	rf.log = append(rf.log, newEntry)
 	rf.persist()
-	rf.matchIndex[rf.me] = len(rf.log) - 1
-	DPrintf("START: Leader %v received command from client, log length: %v", rf.me, len(rf.log))
+	rf.matchIndex[rf.me] = index
+	DPrintf("START: Leader %v received command from client, log length: %v", rf.me, index+1)
 	//DPrintf("Log content: %v", rf.log)
 	return index, term, isLeader
 }
@@ -398,21 +424,34 @@ func (rf *Raft) sendHeartBeat() {
 		server := i
 		if server != rf.me {
 			nextIdx := rf.nextIndex[server]
-			entries := make([]LogEtry, len(rf.log[nextIdx:]))
-			copy(entries, rf.log[nextIdx:])
-			args := AppendEntryArgs{
-				Term:     rf.currentTerm,
-				LeaderId: rf.me,
-				//IsHeartBeat: true,
-				PrevLogIndex: nextIdx - 1,
-				PrevLogTerm:  rf.log[nextIdx-1].Term,
-				Entries:      entries,
-				LeaderCommit: rf.commitIndex,
+			entries := make([]LogEtry, rf.getLastLogIndex()-nextIdx+1)
+			if nextIdx <= rf.lastLogIndexNotIncluded {
+				//TODO: CALL INSTALLSNAPSHOT
+				DPrintf("!!!!!!!!!!!!!!!!!!!!!!!!!1")
+				DPrintf("nextIdx: %v, notIncluded: %v", nextIdx, rf.lastLogIndexNotIncluded)
+			} else {
+				startIdx := nextIdx - rf.lastLogIndexNotIncluded - 1
+				DPrintf("SD_HEART_BEAT: start Idx: %v", startIdx)
+				copy(entries, rf.log[startIdx:])
+				DPrintf("SD_HEART_BEAT: entries: %v", entries)
+				prevLogTerm := rf.lastLogTermNotIncluded
+				if startIdx > 0 {
+					prevLogTerm = rf.log[startIdx-1].Term
+				}
+				args := AppendEntryArgs{
+					Term:     rf.currentTerm,
+					LeaderId: rf.me,
+					//IsHeartBeat: true,
+					PrevLogIndex: nextIdx - 1,
+					PrevLogTerm:  prevLogTerm,
+					Entries:      entries,
+					LeaderCommit: rf.commitIndex,
+				}
+				reply := AppendEntryReply{
+					Success: false,
+				}
+				go rf.sendAppendEntry(server, &args, &reply)
 			}
-			reply := AppendEntryReply{
-				Success: false,
-			}
-			go rf.sendAppendEntry(server, &args, &reply)
 		}
 	}
 }
@@ -424,15 +463,17 @@ func (rf *Raft) startElection() {
 	DPrintf("ELECTION: server %v start election on new term %v", rf.me, rf.currentTerm)
 	rf.votedFor = rf.me
 	rf.persist()
-	lastLogTerm := 0
-	if len(rf.log) > 0 {
-		lastLogTerm = rf.log[len(rf.log)-1].Term
-	}
+	/*
+		lastLogTerm := rf.lastLogTermNotIncluded
+		if len(rf.log) > 0 {
+			lastLogTerm = rf.log[len(rf.log)-1].Term
+		}
+	*/
 	args := RequestVoteArgs{
 		Term:         rf.currentTerm,
 		CandidateId:  rf.me,
-		LastLogIndex: len(rf.log) - 1,
-		LastLogTerm:  lastLogTerm,
+		LastLogIndex: rf.getLastLogIndex(),
+		LastLogTerm:  rf.getLastLogTerm(),
 	}
 	vote := 1
 
@@ -454,9 +495,12 @@ func (rf *Raft) newTerm(newTerm int) {
 
 func (rf *Raft) elected() {
 	rf.serverState = LEADER
+	lastLogIndex := rf.getLastLogIndex()
+	DPrintf("ELECTED: Leader % v Elected===========", rf.me)
 	for idx := range rf.nextIndex {
-		rf.nextIndex[idx] = len(rf.log)
+		rf.nextIndex[idx] = lastLogIndex + 1
 	}
+	DPrintf("ELECTED: Leader %v nextIdx array %v===========", rf.me, rf.nextIndex)
 }
 
 //
@@ -495,6 +539,10 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	//Volatile states on leaders
 	rf.nextIndex = make([]int, len(peers))
 	rf.matchIndex = make([]int, len(peers))
+
+	//2D last log info. Persisted for recovery
+	rf.lastLogIndexNotIncluded = -1
+	rf.lastLogTermNotIncluded = -1
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
