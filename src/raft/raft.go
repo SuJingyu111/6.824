@@ -429,6 +429,17 @@ func (rf *Raft) sendHeartBeat() {
 				//TODO: CALL INSTALLSNAPSHOT
 				DPrintf("!!!!!!!!!!!!!!!!!!!!!!!!!1")
 				DPrintf("nextIdx: %v, notIncluded: %v", nextIdx, rf.lastLogIndexNotIncluded)
+				args := InstallSnapShotArg{
+					Term:              rf.currentTerm,
+					LeaderId:          rf.me,
+					LastIncludedIndex: rf.lastLogIndexNotIncluded,
+					LastIncludedTerm:  rf.lastLogTermNotIncluded,
+					Offset:            0,
+					Data:              rf.persister.ReadSnapshot(),
+					done:              false,
+				}
+				reply := InstallSnapShotReply{}
+				go rf.sendInstallSnapshot(server, &args, &reply)
 			} else {
 				startIdx := nextIdx - rf.lastLogIndexNotIncluded - 1
 				DPrintf("SD_HEART_BEAT: start Idx: %v", startIdx)
@@ -439,9 +450,8 @@ func (rf *Raft) sendHeartBeat() {
 					prevLogTerm = rf.log[startIdx-1].Term
 				}
 				args := AppendEntryArgs{
-					Term:     rf.currentTerm,
-					LeaderId: rf.me,
-					//IsHeartBeat: true,
+					Term:         rf.currentTerm,
+					LeaderId:     rf.me,
 					PrevLogIndex: nextIdx - 1,
 					PrevLogTerm:  prevLogTerm,
 					Entries:      entries,
@@ -463,12 +473,6 @@ func (rf *Raft) startElection() {
 	DPrintf("ELECTION: server %v start election on new term %v", rf.me, rf.currentTerm)
 	rf.votedFor = rf.me
 	rf.persist()
-	/*
-		lastLogTerm := rf.lastLogTermNotIncluded
-		if len(rf.log) > 0 {
-			lastLogTerm = rf.log[len(rf.log)-1].Term
-		}
-	*/
 	args := RequestVoteArgs{
 		Term:         rf.currentTerm,
 		CandidateId:  rf.me,

@@ -38,3 +38,20 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 func (rf *Raft) InstallSnapshot(args *InstallSnapShotArg, reply *InstallSnapShotReply) {
 
 }
+
+func (rf *Raft) sendInstallSnapshot(server int, args *InstallSnapShotArg, reply *InstallSnapShotReply) bool {
+	ok := rf.peers[server].Call("Raft.InstallSnapShot", args, reply)
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	if ok {
+		if reply.Term > rf.currentTerm {
+			DPrintf("SD_INSTALL_SNAP: Server %v reply term %v greater than self term %v, turn follower", rf.me, reply.Term, rf.currentTerm)
+			rf.newTerm(reply.Term)
+		} else {
+			DPrintf("SD_INSTALL_SNAP: Server %v install snapshot to server %v success", rf.me, server)
+		}
+	} else {
+		DPrintf("SD_INSTALL_SNAP: Server %v install snapshot to server %v RPC fail", rf.me, server)
+	}
+	return true
+}
