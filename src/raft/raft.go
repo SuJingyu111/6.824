@@ -137,14 +137,16 @@ func (rf *Raft) persist() {
 	// e.Encode(rf.yyy)
 	// data := w.Bytes()
 	// rf.persister.SaveRaftState(data)
-	w := new(bytes.Buffer)
-	e := labgob.NewEncoder(w)
-	e.Encode(rf.currentTerm)
-	e.Encode(rf.votedFor)
-	e.Encode(rf.log)
-	e.Encode(rf.lastLogIndexNotIncluded)
-	e.Encode(rf.lastLogTermNotIncluded)
-	data := w.Bytes()
+	/*
+		w := new(bytes.Buffer)
+		e := labgob.NewEncoder(w)
+		e.Encode(rf.currentTerm)
+		e.Encode(rf.votedFor)
+		e.Encode(rf.log)
+		e.Encode(rf.lastLogIndexNotIncluded)
+		e.Encode(rf.lastLogTermNotIncluded)
+	*/
+	data := rf.serializeState()
 	rf.persister.SaveRaftState(data)
 }
 
@@ -293,6 +295,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 // the struct itself.
 //
 func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bool {
+	DPrintf("SD_REQ_VOTE: Sent vote request to server %v", server)
 	reply := &RequestVoteReply{}
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
 	rf.mu.Lock()
@@ -403,8 +406,11 @@ func (rf *Raft) tick() {
 		rf.sendHeartBeat()
 		rf.commitHandler()
 	} else if time.Now().After(rf.timeStamp.Add(rf.electionTimeOut)) {
+		DPrintf("TICK : Server %v start election", rf.me)
 		rf.resetTimeAndTimeOut()
 		rf.startElection()
+	} else {
+		DPrintf("TICK : Server %v tick", rf.me)
 	}
 }
 
