@@ -295,7 +295,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 // the struct itself.
 //
 func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bool {
-	DPrintf("SD_REQ_VOTE: Sent vote request to server %v", server)
+	//DPrintf("SD_REQ_VOTE: Server %v Sent vote request to server %v", server)
 	reply := &RequestVoteReply{}
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
 	rf.mu.Lock()

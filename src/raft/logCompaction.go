@@ -62,19 +62,20 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	defer rf.mu.Unlock()
 	snapshotIndex := rf.lastLogIndexNotIncluded
 	if index <= snapshotIndex {
-		DPrintf("{Node %v} rejects replacing log with snapshotIndex %v as current snapshotIndex %v is larger in term %v", rf.me, index, snapshotIndex, rf.currentTerm)
+		DPrintf("SNAP SHOT: {Node %v} rejects replacing log with snapshotIndex %v as current snapshotIndex %v is larger in term %v", rf.me, index, snapshotIndex, rf.currentTerm)
 		return
 	}
 	rf.trimLog(index)
 	rf.persister.SaveStateAndSnapshot(rf.serializeState(), snapshot)
-	DPrintf("{Node %v}'s state is {state %v,term %v,commitIndex %v,lastApplied %v} after replacing log with snapshotIndex %v as old snapshotIndex %v is smaller", rf.me, rf.serverState, rf.currentTerm, rf.commitIndex, rf.lastApplied, index, snapshotIndex)
+	DPrintf("SNAP SHOT: {Node %v}'s state is {state %v,term %v,commitIndex %v,lastApplied %v} after replacing log with snapshotIndex %v as old snapshotIndex %v is smaller", rf.me, rf.serverState, rf.currentTerm, rf.commitIndex, rf.lastApplied, index, snapshotIndex)
 }
 
 func (rf *Raft) trimLog(index int) {
+	DPrintf("TRIM: Log content of server %v before trim up to index %v: %v", rf.me, index, rf.log)
 	rf.lastLogIndexNotIncluded = index
 	rf.lastLogTermNotIncluded = rf.log[index-rf.lastLogIndexNotIncluded-1].Term
 	rf.log = append([]LogEtry{}, rf.log[index-rf.lastLogIndexNotIncluded:]...)
-	DPrintf("TRIM: Log content of server %v after trim: %v", rf.me, rf.log)
+	DPrintf("TRIM: Log content of server %v after trim up to index %v: %v", rf.me, index, rf.log)
 }
 
 func (rf *Raft) serializeState() []byte {
@@ -91,7 +92,7 @@ func (rf *Raft) serializeState() []byte {
 func (rf *Raft) InstallSnapshot(args *InstallSnapShotArg, reply *InstallSnapShotReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	//defer DPrintf("{Node %v}'s state is {state %v,term %v,commitIndex %v,lastApplied %v,firstLog %v,lastLog %v} before processing InstallSnapshotRequest %v and reply InstallSnapshotResponse %v", rf.me, rf.state, rf.currentTerm, rf.commitIndex, rf.lastApplied, rf.getFirstLog(), rf.getLastLog(), request, response)
+	defer DPrintf("INSTALL_SNAP: {Node %v}'s state is {state %v,term %v,commitIndex %v,lastApplied %v} before processing InstallSnapshotRequest %v and reply InstallSnapshotResponse %v", rf.me, rf.serverState, rf.currentTerm, rf.commitIndex, rf.lastApplied, args, reply)
 
 	reply.Term = rf.currentTerm
 
@@ -117,18 +118,10 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapShotArg, reply *InstallSnapShot
 			SnapshotIndex: args.LastIncludedIndex,
 		}
 	}()
-	/*
-		rf.applyCh <- ApplyMsg{
-			SnapshotValid: true,
-			Snapshot:      args.Data,
-			SnapshotTerm:  args.LastIncludedTerm,
-			SnapshotIndex: args.LastIncludedIndex,
-		}
-	*/
 }
 
 func (rf *Raft) sendInstallSnapshot(server int, args *InstallSnapShotArg, reply *InstallSnapShotReply) bool {
-	ok := rf.peers[server].Call("Raft.InstallSnapShot", args, reply)
+	ok := rf.peers[server].Call("Raft.InstallSnapshot", args, reply)
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	if ok {
