@@ -147,7 +147,7 @@ func (rf *Raft) getMajorReplicatedIndex() int {
 
 func (rf *Raft) commit(commitIdx int, prevCommitIdx int) {
 	DPrintf("COMMIT: Server %v commits %v to %v", rf.me, prevCommitIdx, commitIdx)
-	DPrintf("COMMIT: Server %v current log: %v", rf.me, rf.log)
+	//DPrintf("COMMIT: Server %v current log: %v", rf.me, rf.log)
 	for i := prevCommitIdx + 1; i <= commitIdx; i++ {
 		thisCommitIdx := i
 		//DPrintf("COMMIT: Server %v commits %v to %v", rf.me, prevCommitIdx, commitIdx)
@@ -158,6 +158,7 @@ func (rf *Raft) commit(commitIdx int, prevCommitIdx int) {
 			CommandIndex: thisCommitIdx,
 		}
 		rf.applyCh <- applyMsg
-		DPrintf("COMMIT: Server %v applied log %v with CommandIndex: %v,apply msg: %v", rf.me, thisCommitIdx, applyMsg.CommandIndex, applyMsg)
+		//DPrintf("COMMIT: Server %v applied log %v with CommandIndex: %v,apply msg: %v", rf.me, thisCommitIdx, applyMsg.CommandIndex, applyMsg)
+		DPrintf("COMMIT: Server %v applied log %v with CommandIndex: %v", rf.me, thisCommitIdx, applyMsg.CommandIndex)
 	}
 }

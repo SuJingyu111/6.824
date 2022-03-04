@@ -450,7 +450,7 @@ func (rf *Raft) sendHeartBeat() {
 				startIdx := nextIdx - rf.lastLogIndexNotIncluded - 1
 				DPrintf("SD_HEART_BEAT: start Idx: %v", startIdx)
 				copy(entries, rf.log[startIdx:])
-				DPrintf("SD_HEART_BEAT: entries: %v", entries)
+				//DPrintf("SD_HEART_BEAT: entries: %v", entries)
 				prevLogTerm := rf.lastLogTermNotIncluded
 				if startIdx > 0 {
 					prevLogTerm = rf.log[startIdx-1].Term

@@ -28,7 +28,7 @@ func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int,
 	// Your code here (2D).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	//DPrintf("{Node %v} service calls CondInstallSnapshot with lastIncludedTerm %v and lastIncludedIndex %v to check whether snapshot is still valid in term %v", rf.me, lastIncludedTerm, lastIncludedIndex, rf.currentTerm)
+	DPrintf("COND_SNAP: {Node %v} service calls CondInstallSnapshot with lastIncludedTerm %v and lastIncludedIndex %v to check whether snapshot is still valid in term %v", rf.me, lastIncludedTerm, lastIncludedIndex, rf.currentTerm)
 
 	// outdated snapshot
 	if lastIncludedIndex <= rf.commitIndex {
@@ -60,6 +60,7 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (2D).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+	DPrintf("IN SNAPSHOT****************")
 	snapshotIndex := rf.lastLogIndexNotIncluded
 	if index <= snapshotIndex {
 		DPrintf("SNAP SHOT: {Node %v} rejects replacing log with snapshotIndex %v as current snapshotIndex %v is larger in term %v", rf.me, index, snapshotIndex, rf.currentTerm)
@@ -92,6 +93,7 @@ func (rf *Raft) serializeState() []byte {
 func (rf *Raft) InstallSnapshot(args *InstallSnapShotArg, reply *InstallSnapShotReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+	DPrintf("IN INSTALL_SNAP*************************")
 	defer DPrintf("INSTALL_SNAP: {Node %v}'s state is {state %v,term %v,commitIndex %v,lastApplied %v} before processing InstallSnapshotRequest %v and reply InstallSnapshotResponse %v", rf.me, rf.serverState, rf.currentTerm, rf.commitIndex, rf.lastApplied, args, reply)
 
 	reply.Term = rf.currentTerm
@@ -121,6 +123,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapShotArg, reply *InstallSnapShot
 }
 
 func (rf *Raft) sendInstallSnapshot(server int, args *InstallSnapShotArg, reply *InstallSnapShotReply) bool {
+	DPrintf("In SD_INSTALL_SNAP****************")
 	ok := rf.peers[server].Call("Raft.InstallSnapshot", args, reply)
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
