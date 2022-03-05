@@ -97,6 +97,7 @@ type Raft struct {
 	commitIndex     int
 	lastApplied     int
 	applyCh         chan ApplyMsg
+	applyCond       *sync.Cond
 	serverState     int
 	timeStamp       time.Time
 	electionTimeOut time.Duration
@@ -434,7 +435,7 @@ func (rf *Raft) sendHeartBeat() {
 			if nextIdx <= rf.lastLogIndexNotIncluded {
 				//TODO: CALL INSTALLSNAPSHOT
 				DPrintf("!!!!!!!!!!!!!!!!!!!!!!!!!1")
-				DPrintf("nextIdx: %v, notIncluded: %v", nextIdx, rf.lastLogIndexNotIncluded)
+				DPrintf("Leader %v nextIdx: %v, notIncluded: %v for server %v", rf.me, nextIdx, rf.lastLogIndexNotIncluded, server)
 				args := InstallSnapShotArg{
 					Term:              rf.currentTerm,
 					LeaderId:          rf.me,
@@ -442,7 +443,7 @@ func (rf *Raft) sendHeartBeat() {
 					LastIncludedTerm:  rf.lastLogTermNotIncluded,
 					Offset:            0,
 					Data:              rf.persister.ReadSnapshot(),
-					done:              false,
+					Done:              false,
 				}
 				reply := InstallSnapShotReply{}
 				go rf.sendInstallSnapshot(server, &args, &reply)
@@ -542,6 +543,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.commitIndex = 0
 	rf.lastApplied = 0
 	rf.applyCh = applyCh
+	rf.applyCond = sync.NewCond(&rf.mu)
 	rf.serverState = FOLLOWER
 	rf.timeStamp = time.Now()
 	rf.electionTimeOut = time.Millisecond * time.Duration(ElectionTimeBase+rand.Intn(ElectionTimeRandInterval))
@@ -557,10 +559,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
-	rf.commit(0, -1)
+	rf.apply(0, -1)
 
 	// start ticker goroutine to start elections
 	go rf.ticker()
+
+	go rf.applier()
 
 	return rf
 }

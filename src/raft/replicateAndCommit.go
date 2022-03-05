@@ -93,6 +93,9 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 		if args.PrevLogIndex >= rf.getLastLogIndex()+1 || args.PrevLogIndex < rf.lastLogIndexNotIncluded || (args.PrevLogIndex == rf.lastLogIndexNotIncluded && args.PrevLogTerm != rf.lastLogTermNotIncluded) ||
 			(args.PrevLogIndex > rf.lastLogIndexNotIncluded && rf.log[args.PrevLogIndex-rf.lastLogIndexNotIncluded-1].Term != args.PrevLogTerm) {
 			DPrintf("APP_ENTRY: Server %v refused log append from leader %v", rf.me, args.LeaderId)
+			DPrintf("APP_ENTRY: For Server %v, parameters: args.PrevLogIndex: %v, rf.getLastLogIndex()+1: %v, rf.lastLogIndexNotIncluded: %v, "+
+				"rf.lastLogTermNotIncluded: %v", rf.me, args.PrevLogIndex, rf.getLastLogIndex()+1, rf.lastLogIndexNotIncluded, rf.lastLogTermNotIncluded)
+			DPrintf("APP_ENTRY: Server %v log content: %v", rf.me, rf.log)
 			reply.Term = rf.currentTerm
 			reply.Success = false
 			return
@@ -109,9 +112,10 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 		//Check commit index & apply
 		if rf.commitIndex < args.LeaderCommit {
 			DPrintf("IN APP ENTRY***")
-			prevCommitIdx := rf.commitIndex
+			//prevCommitIdx := rf.commitIndex
 			rf.commitIndex = int(math.Min(float64(args.LeaderCommit), float64(rf.getLastLogIndex())))
-			rf.commit(rf.commitIndex, prevCommitIdx)
+			//rf.commit(rf.commitIndex, prevCommitIdx)
+			rf.applyCond.Broadcast()
 		} else {
 			DPrintf("Server %v cannot commit", rf.me)
 		}
@@ -128,9 +132,10 @@ func (rf *Raft) commitHandler() {
 	DPrintf("IN COMMIT HANDLER***")
 	newCommitIndex := rf.getMajorReplicatedIndex()
 	prevCommitIndex := rf.commitIndex
-	if newCommitIndex > 0 && newCommitIndex < rf.getLastLogIndex()+1 && rf.log[newCommitIndex-rf.lastLogIndexNotIncluded-1].Term == rf.currentTerm && newCommitIndex > rf.commitIndex {
+	if newCommitIndex > rf.lastLogIndexNotIncluded && newCommitIndex < rf.getLastLogIndex()+1 && rf.log[newCommitIndex-rf.lastLogIndexNotIncluded-1].Term == rf.currentTerm && newCommitIndex > rf.commitIndex {
 		rf.commitIndex = newCommitIndex
-		rf.commit(newCommitIndex, prevCommitIndex)
+		//rf.commit(newCommitIndex, prevCommitIndex)
+		rf.applyCond.Broadcast()
 		rf.sendHeartBeat()
 	} else {
 		DPrintf("Leader not commit, prevCommitIdx: %v, newCommitIdx: %v", prevCommitIndex, newCommitIndex)
@@ -145,7 +150,7 @@ func (rf *Raft) getMajorReplicatedIndex() int {
 	return logCpy[len(logCpy)/2]
 }
 
-func (rf *Raft) commit(commitIdx int, prevCommitIdx int) {
+func (rf *Raft) apply(commitIdx int, prevCommitIdx int) {
 	DPrintf("COMMIT: Server %v commits %v to %v", rf.me, prevCommitIdx, commitIdx)
 	//DPrintf("COMMIT: Server %v current log: %v", rf.me, rf.log)
 	for i := prevCommitIdx + 1; i <= commitIdx; i++ {
