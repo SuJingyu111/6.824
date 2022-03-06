@@ -36,12 +36,14 @@ func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int,
 	}
 
 	if lastIncludedIndex > rf.getLastLogIndex() {
-		rf.log = make([]LogEtry, 1)
+		rf.log = make([]LogEtry, 0)
 		//DPrintf("")
 	} else {
 		rf.trimLog(lastIncludedIndex)
 	}
 	rf.lastApplied, rf.commitIndex = lastIncludedIndex, lastIncludedIndex
+	rf.lastLogIndexNotIncluded, rf.lastLogTermNotIncluded = lastIncludedIndex, lastIncludedTerm
+	//rf.persist()
 
 	rf.persister.SaveStateAndSnapshot(rf.serializeState(), snapshot)
 	DPrintf("COND_SNAP: Server %v after install: lastApplied: %v, commitIndex: %v, log: %v", rf.me, rf.lastApplied, rf.commitIndex, rf.log)
@@ -67,6 +69,7 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 }
 
 func (rf *Raft) trimLog(index int) {
+	//TODO: LEAVE ONE DUMMY LOG AT THE HEAD TO WORK WITH THE FIRST LOG IN MAKE.
 	DPrintf("TRIM: Log content of server %v before trim up to index %v: %v", rf.me, index, rf.log)
 	DPrintf("TRIM: lastLogIndexNotIncluded: %v, index: %v, log length: %v", rf.lastLogTermNotIncluded, index, len(rf.log))
 	DPrintf("TRIM: last real index: %v", index-rf.lastLogIndexNotIncluded-1)
@@ -76,6 +79,7 @@ func (rf *Raft) trimLog(index int) {
 	DPrintf("TRIM: new log: %v, supposed content: %v", newLog, rf.log[index-rf.lastLogIndexNotIncluded:])
 	rf.log = newLog
 	rf.lastLogIndexNotIncluded = index
+	rf.persist()
 	//rf.log = append([]LogEtry{}, rf.log[index-rf.lastLogIndexNotIncluded:]...)
 	DPrintf("TRIM: Log content of server %v after trim up to index %v: %v", rf.me, index, rf.log)
 }

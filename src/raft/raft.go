@@ -312,6 +312,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bo
 			*vote++
 			if *vote > len(rf.peers)/2 && rf.currentTerm == args.Term && rf.serverState == CANDIDATE {
 				DPrintf("SD_RQ_VOTE: candidate %v is now leader, log length: %v-----------------------", rf.me, rf.getLastLogIndex()+1)
+				DPrintf("SD_RQ_VOTE: candidate %v is now leader, log content: %v-----------------------", rf.me, rf.log)
 				rf.elected()
 				rf.sendHeartBeat()
 			}
@@ -433,7 +434,6 @@ func (rf *Raft) sendHeartBeat() {
 			nextIdx := rf.nextIndex[server]
 			entries := make([]LogEtry, rf.getLastLogIndex()-nextIdx+1)
 			if nextIdx <= rf.lastLogIndexNotIncluded {
-				//TODO: CALL INSTALLSNAPSHOT
 				DPrintf("!!!!!!!!!!!!!!!!!!!!!!!!!1")
 				DPrintf("Leader %v nextIdx: %v, notIncluded: %v for server %v", rf.me, nextIdx, rf.lastLogIndexNotIncluded, server)
 				args := InstallSnapShotArg{
