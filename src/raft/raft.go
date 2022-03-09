@@ -405,8 +405,8 @@ func (rf *Raft) tick() {
 	if rf.serverState == LEADER {
 		DPrintf("TICK : Leader %v tick", rf.me)
 		rf.resetTimeAndTimeOut()
-		rf.sendHeartBeat()
 		rf.commitHandler()
+		rf.sendHeartBeat()
 	} else if time.Now().After(rf.timeStamp.Add(rf.electionTimeOut)) {
 		DPrintf("TICK : Server %v start election", rf.me)
 		rf.resetTimeAndTimeOut()
