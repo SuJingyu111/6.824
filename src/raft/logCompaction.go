@@ -35,12 +35,12 @@ func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int,
 		return false
 	}
 
-	if lastIncludedIndex > rf.getLastLogIndex() {
-		rf.log = make([]LogEtry, 0)
-		//DPrintf("")
-	} else {
-		rf.trimLog(lastIncludedIndex)
-	}
+	//if lastIncludedIndex > rf.getLastLogIndex() {
+	rf.log = make([]LogEtry, 0)
+	//DPrintf("")
+	//} else {
+	//	rf.trimLog(lastIncludedIndex)
+	//}
 	rf.lastApplied, rf.commitIndex = lastIncludedIndex, lastIncludedIndex
 	rf.lastLogIndexNotIncluded, rf.lastLogTermNotIncluded = lastIncludedIndex, lastIncludedTerm
 	//rf.persist()
