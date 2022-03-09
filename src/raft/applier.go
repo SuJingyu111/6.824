@@ -17,15 +17,16 @@ func (rf *Raft) applier() {
 		if first < last {
 			copy(entries, rf.log[first:last])
 		}
-		rf.lastApplied = entries[len(entries)-1].Index
+		//rf.lastApplied = entries[len(entries)-1].Index
+		rf.lastApplied = lastApplied + len(entries)
 		rf.mu.Unlock()
-		for _, entry := range entries {
+		for idx, entry := range entries {
 			rf.applyCh <- ApplyMsg{
 				CommandValid: true,
 				Command:      entry.Command,
-				CommandIndex: entry.Index,
+				CommandIndex: lastApplied + idx + 1,
 			}
-			DPrintf("APPLIER: Server %v applied entry with real index %v", rf.me, entry.Index)
+			DPrintf("APPLIER: Server %v applied entry with real index %v", rf.me, lastApplied+idx+1)
 		}
 		rf.mu.Lock()
 		// use commitIndex rather than rf.commitIndex because rf.commitIndex may change during the Unlock() and Lock()

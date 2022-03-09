@@ -20,6 +20,7 @@ package raft
 import (
 	"6.824/labgob"
 	"bytes"
+	//"math"
 	"math/rand"
 	//	"bytes"
 	"sync"
@@ -57,7 +58,7 @@ type ApplyMsg struct {
 type LogEtry struct {
 	Term    int
 	Command interface{}
-	Index   int
+	//Index   int
 }
 
 //Constants
@@ -176,17 +177,19 @@ func (rf *Raft) readPersist(data []byte) {
 	var currentTerm int
 	var voterdFor int
 	var persistLog []LogEtry
-	var lastLogIndexNotIncluded int
-	var lastLogTermNotIncluded int
+	//var lastLogIndexNotIncluded int
+	//var lastLogTermNotIncluded int
 	if d.Decode(&currentTerm) != nil ||
-		d.Decode(&voterdFor) != nil || d.Decode(&persistLog) != nil || d.Decode(&lastLogIndexNotIncluded) != nil || d.Decode(&lastLogTermNotIncluded) != nil {
+		d.Decode(&voterdFor) != nil || d.Decode(&persistLog) != nil { //|| d.Decode(&lastLogIndexNotIncluded) != nil || d.Decode(&lastLogTermNotIncluded) != nil
 		DPrintf("read persist went wrong!")
 	} else {
 		rf.currentTerm = currentTerm
 		rf.votedFor = voterdFor
 		rf.log = persistLog
-		rf.lastLogTermNotIncluded = lastLogTermNotIncluded
-		rf.lastLogIndexNotIncluded = lastLogIndexNotIncluded
+		//rf.lastLogTermNotIncluded = lastLogTermNotIncluded
+		//rf.lastLogIndexNotIncluded = lastLogIndexNotIncluded
+		//rf.lastApplied = int(math.Max(float64(rf.lastApplied), float64(rf.lastLogIndexNotIncluded)))
+		//rf.commitIndex = int(math.Max(float64(rf.commitIndex), float64(rf.lastApplied)))
 	}
 }
 
@@ -217,7 +220,7 @@ func (rf *Raft) getLastLogIndex() int {
 	if len(rf.log) == 0 {
 		return rf.lastLogIndexNotIncluded
 	}
-	return rf.log[len(rf.log)-1].Index
+	return rf.lastLogIndexNotIncluded + len(rf.log)
 }
 
 //This is not locked! Check lock in outer scope!
@@ -233,7 +236,7 @@ func (rf *Raft) getFirstLogIndex() int {
 	if len(rf.log) == 0 {
 		return rf.lastLogIndexNotIncluded
 	}
-	return rf.log[0].Index
+	return rf.lastLogIndexNotIncluded + 1
 }
 
 //This is not locked! Check lock in outer scope!
@@ -368,7 +371,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	newEntry := LogEtry{
 		Term:    term,
 		Command: command,
-		Index:   index,
+		//Index:   index,
 	}
 	rf.log = append(rf.log, newEntry)
 	rf.persist()
@@ -572,10 +575,11 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.lastLogIndexNotIncluded = -1
 	rf.lastLogTermNotIncluded = -1
 
+	rf.apply(0, -1)
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
-	rf.apply(0, -1)
+	//rf.apply(0, -1)
 
 	// start ticker goroutine to start elections
 	go rf.ticker()
