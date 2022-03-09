@@ -17,6 +17,7 @@ func (rf *Raft) applier() {
 		if first < last {
 			copy(entries, rf.log[first:last])
 		}
+		rf.lastApplied = entries[len(entries)-1].Index
 		rf.mu.Unlock()
 		for _, entry := range entries {
 			rf.applyCh <- ApplyMsg{
@@ -25,7 +26,6 @@ func (rf *Raft) applier() {
 				CommandIndex: entry.Index,
 			}
 			DPrintf("APPLIER: Server %v applied entry with real index %v", rf.me, entry.Index)
-			rf.lastApplied = entry.Index
 		}
 		rf.mu.Lock()
 		// use commitIndex rather than rf.commitIndex because rf.commitIndex may change during the Unlock() and Lock()

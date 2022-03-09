@@ -90,7 +90,8 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 		if args.PrevLogIndex < rf.getLastLogIndex()+1 {
 			//DPrintf("APP_ENTRY: Server %v pervLogTerm: %v", rf.me, rf.log[args.PrevLogIndex].Term)
 		}
-		if args.PrevLogIndex >= rf.getLastLogIndex()+1 || args.PrevLogIndex < rf.lastLogIndexNotIncluded || (args.PrevLogIndex == rf.lastLogIndexNotIncluded && args.PrevLogTerm != rf.lastLogTermNotIncluded) ||
+		//TODO: MODIFY HERE
+		if args.PrevLogIndex >= rf.getLastLogIndex()+1 || (args.PrevLogIndex == rf.lastLogIndexNotIncluded && args.PrevLogTerm != rf.lastLogTermNotIncluded) ||
 			(args.PrevLogIndex > rf.lastLogIndexNotIncluded && rf.log[args.PrevLogIndex-rf.lastLogIndexNotIncluded-1].Term != args.PrevLogTerm) {
 			DPrintf("APP_ENTRY: Server %v refused log append from leader %v", rf.me, args.LeaderId)
 			DPrintf("APP_ENTRY: For Server %v, parameters: args.PrevLogIndex: %v, rf.getLastLogIndex()+1: %v, rf.lastLogIndexNotIncluded: %v, "+
@@ -100,10 +101,23 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 			reply.Success = false
 			return
 		} else {
-			rf.log = rf.log[:args.PrevLogIndex+1-rf.lastLogIndexNotIncluded-1]
-			rf.log = append(rf.log, args.Entries...)
+			DPrintf("APP_ENTRY: args.PrevLogIndex %v, rf.lastLogIndexNotIncluded %v, rf.getFirstLogIndex() %v", args.PrevLogIndex, rf.lastLogIndexNotIncluded, rf.getFirstLogIndex())
+			DPrintf("APP_ENTRY: Server %v ,log content before append: %v", rf.me, rf.log)
+			if args.PrevLogIndex > rf.lastLogIndexNotIncluded {
+				rf.log = rf.log[:args.PrevLogIndex+1-rf.lastLogIndexNotIncluded-1]
+				rf.log = append(rf.log, args.Entries...)
+			} else if args.PrevLogIndex == rf.lastLogIndexNotIncluded {
+				//rf.log = make([]LogEtry, 0)
+				//rf.log = append(rf.log, args.Entries...)
+				rf.log = args.Entries
+			} else {
+				firstLogIndex := rf.getFirstLogIndex()
+				rf.log = make([]LogEtry, 0)
+				rf.log = append(rf.log, args.Entries[firstLogIndex-args.PrevLogIndex-1:]...)
+			}
 			rf.persist()
 			DPrintf("APP_ENTRY: Server %v append entries, current log length: %v", rf.me, rf.getLastLogIndex()+1)
+			DPrintf("APP_ENTRY: Server %v new log after append: %v", rf.me, rf.log)
 			//DPrintf("Log content: %v", rf.log)
 			reply.Term = rf.currentTerm
 			reply.Success = true
@@ -120,7 +134,7 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 			DPrintf("Server %v cannot commit", rf.me)
 		}
 	} else {
-		DPrintf("APP_ENTRY: Server %v in term %v received append log of term %v---", rf.me, rf.currentTerm, args.Term)
+		DPrintf("APP_ENTRY: Server %v in term %v received append log of term %v and refused---", rf.me, rf.currentTerm, args.Term)
 		reply.Term = rf.currentTerm
 		reply.Success = false
 	}

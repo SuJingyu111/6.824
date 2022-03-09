@@ -228,6 +228,22 @@ func (rf *Raft) getLastLogTerm() int {
 	return rf.log[len(rf.log)-1].Term
 }
 
+//This is not locked! Check lock in outer scope!
+func (rf *Raft) getFirstLogIndex() int {
+	if len(rf.log) == 0 {
+		return rf.lastLogIndexNotIncluded
+	}
+	return rf.log[0].Index
+}
+
+//This is not locked! Check lock in outer scope!
+func (rf *Raft) getFirstLogTerm() int {
+	if len(rf.log) == 0 {
+		return rf.lastLogTermNotIncluded
+	}
+	return rf.log[0].Term
+}
+
 //
 // example RequestVote RPC handler.
 //
