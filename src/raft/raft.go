@@ -237,8 +237,8 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	defer rf.mu.Unlock()
 
 	if args.Term > rf.currentTerm {
+		DPrintf("RQVOTE: Server %v receives higher term rqvote RPC. Turns follower from term %v to term %v", rf.me, rf.currentTerm, args.Term)
 		rf.newTerm(args.Term)
-		DPrintf("RQVOTE: Leader %v receives higher term rqvote RPC. Turns follower", rf.me)
 	}
 
 	lastLogTerm := rf.getLastLogTerm()
