@@ -111,9 +111,15 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 				//rf.log = append(rf.log, args.Entries...)
 				rf.log = args.Entries
 			} else {
-				firstLogIndex := rf.getFirstLogIndex()
-				rf.log = make([]LogEtry, 0)
-				rf.log = append(rf.log, args.Entries[firstLogIndex-args.PrevLogIndex-1:]...)
+				if len(rf.log) == 0 {
+					firstLogIndex := rf.getFirstLogIndex() + 1
+					rf.log = make([]LogEtry, 0)
+					rf.log = append(rf.log, args.Entries[firstLogIndex-args.PrevLogIndex-1:]...)
+				} else {
+					firstLogIndex := rf.getFirstLogIndex()
+					rf.log = make([]LogEtry, 0)
+					rf.log = append(rf.log, args.Entries[firstLogIndex-args.PrevLogIndex-1:]...)
+				}
 			}
 			rf.persist()
 			DPrintf("APP_ENTRY: Server %v append entries, current log length: %v", rf.me, rf.getLastLogIndex()+1)

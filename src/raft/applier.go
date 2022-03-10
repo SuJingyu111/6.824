@@ -26,7 +26,7 @@ func (rf *Raft) applier() {
 				Command:      entry.Command,
 				CommandIndex: lastApplied + idx + 1,
 			}
-			DPrintf("APPLIER: Server %v applied entry with real index %v", rf.me, lastApplied+idx+1)
+			DPrintf("APPLIER: Server %v applied entry with real index %v and content %v", rf.me, lastApplied+idx+1, entry.Command)
 		}
 		rf.mu.Lock()
 		// use commitIndex rather than rf.commitIndex because rf.commitIndex may change during the Unlock() and Lock()
