@@ -50,7 +50,7 @@ func (rf *Raft) sendAppendEntry(server int, args *AppendEntryArgs, reply *Append
 					nextTerm = rf.log[rf.nextIndex[server]-rf.lastLogIndexNotIncluded-1].Term
 				}
 				DPrintf("SD_APP_ENTRY: nextIdx of server %v: %v, term of next idx: %v", server, rf.nextIndex[server], nextTerm)
-				for rf.nextIndex[server] > 1 && rf.nextIndex[server] > rf.lastLogIndexNotIncluded && rf.log[rf.nextIndex[server]-rf.lastLogIndexNotIncluded-1].Term == nextTerm {
+				for rf.nextIndex[server] > rf.lastLogIndexNotIncluded && rf.log[rf.nextIndex[server]-rf.lastLogIndexNotIncluded-1].Term == nextTerm {
 					rf.nextIndex[server] = rf.nextIndex[server] - 1
 				}
 				DPrintf("SD_APP_ENTRY: nextIdx of server %v: %v", server, rf.nextIndex[server])
