@@ -156,7 +156,7 @@ func (rf *Raft) commitHandler() {
 		rf.commitIndex = newCommitIndex
 		//rf.commit(newCommitIndex, prevCommitIndex)
 		rf.applyCond.Broadcast()
-		rf.sendHeartBeat()
+		//rf.sendHeartBeat()
 	} else {
 		DPrintf("Leader not commit, prevCommitIdx: %v, newCommitIdx: %v", prevCommitIndex, newCommitIndex)
 	}
@@ -170,6 +170,7 @@ func (rf *Raft) getMajorReplicatedIndex() int {
 	return logCpy[len(logCpy)/2]
 }
 
+/*
 func (rf *Raft) apply(commitIdx int, prevCommitIdx int) {
 	DPrintf("COMMIT: Server %v commits %v to %v", rf.me, prevCommitIdx, commitIdx)
 	//DPrintf("COMMIT: Server %v current log: %v", rf.me, rf.log)
@@ -186,4 +187,15 @@ func (rf *Raft) apply(commitIdx int, prevCommitIdx int) {
 		//DPrintf("COMMIT: Server %v applied log %v with CommandIndex: %v,apply msg: %v", rf.me, thisCommitIdx, applyMsg.CommandIndex, applyMsg)
 		DPrintf("COMMIT: Server %v applied log %v with CommandIndex: %v", rf.me, thisCommitIdx, applyMsg.CommandIndex)
 	}
+}*/
+
+func (rf *Raft) applyInit() {
+	DPrintf("APPLY_INIT: Server %v", rf.me)
+	//DPrintf("COMMIT: Server %v current log: %v", rf.me, rf.log)
+	applyMsg := ApplyMsg{
+		CommandValid: true,
+		Command:      0,
+		CommandIndex: 0,
+	}
+	rf.applyCh <- applyMsg
 }

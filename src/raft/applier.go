@@ -5,7 +5,6 @@ import "math"
 func (rf *Raft) applier() {
 	for rf.killed() == false {
 		rf.mu.Lock()
-		// if there is no need to apply entries, just release CPU and wait other goroutine's signal if they commit new entries
 		for rf.lastApplied >= rf.commitIndex {
 			rf.applyCond.Wait()
 		}
@@ -28,13 +27,11 @@ func (rf *Raft) applier() {
 			}
 			DPrintf("APPLIER: Server %v applied entry with real index %v and content %v", rf.me, lastApplied+idx+1, entry.Command)
 		}
-		rf.mu.Lock()
-		// use commitIndex rather than rf.commitIndex because rf.commitIndex may change during the Unlock() and Lock()
-		// use Max(rf.lastApplied, commitIndex) rather than commitIndex directly to avoid concurrently InstallSnapshot rpc causing lastApplied to rollback
-		//if last > rf.lastApplied {
-		//	rf.lastApplied = last - 1
-		//}
-		DPrintf("Server %v applies entries %v-%v in term %v", rf.me, first, last, rf.currentTerm)
-		rf.mu.Unlock()
+		/*
+			rf.mu.Lock()
+
+			DPrintf("Server %v applies entries %v-%v in term %v", rf.me, first, last, rf.currentTerm)
+			rf.mu.Unlock()
+		*/
 	}
 }

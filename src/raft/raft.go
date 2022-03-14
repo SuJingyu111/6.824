@@ -445,7 +445,7 @@ func (rf *Raft) resetTimeAndTimeOut() {
 func (rf *Raft) sendHeartBeat() {
 	//rf.electionCond.L.Unlock()
 	for i := range rf.peers {
-		if !(rf.serverState == LEADER) {
+		if !(rf.serverState == LEADER) || rf.killed() {
 			break
 		}
 		server := i
@@ -576,16 +576,15 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.lastLogIndexNotIncluded = -1
 	rf.lastLogTermNotIncluded = -1
 
-	rf.apply(0, -1)
+	rf.applyInit()
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
 	//rf.apply(0, -1)
+	go rf.applier()
 
 	// start ticker goroutine to start elections
 	go rf.ticker()
-
-	go rf.applier()
 
 	return rf
 }

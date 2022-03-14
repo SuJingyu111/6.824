@@ -26,6 +26,9 @@ type InstallSnapShotReply struct {
 func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int, snapshot []byte) bool {
 
 	// Your code here (2D).
+	if rf.killed() {
+		return false
+	}
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	DPrintf("COND_SNAP: Server %v  service calls CondInstallSnapshot with lastIncludedTerm %v and lastIncludedIndex %v to check whether snapshot is still valid in term %v", rf.me, lastIncludedTerm, lastIncludedIndex, rf.currentTerm)
@@ -56,6 +59,9 @@ func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int,
 // that index. Raft should now trim its log as much as possible.
 func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (2D).
+	if rf == nil {
+		return
+	}
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	DPrintf("IN SNAPSHOT****************")
@@ -65,7 +71,7 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	}
 	rf.trimLog(index)
 	rf.persister.SaveStateAndSnapshot(rf.serializeState(), snapshot)
-	DPrintf("SNAP SHOT: Server %v's state is {state %v,term %v,commitIndex %v,lastApplied %v} after replacing log with snapshotIndex %v as old snapshotIndex %v is smaller", rf.me, rf.serverState, rf.currentTerm, rf.commitIndex, rf.lastApplied, index, rf.lastLogIndexNotIncluded)
+	DPrintf("SNAP SHOT: Server %v's state is state %v,term %v,commitIndex %v,lastApplied %v after replacing log with snapshotIndex %v as old snapshotIndex %v is smaller", rf.me, rf.serverState, rf.currentTerm, rf.commitIndex, rf.lastApplied, index, rf.lastLogIndexNotIncluded)
 }
 
 func (rf *Raft) trimLog(index int) {
@@ -99,7 +105,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapShotArg, reply *InstallSnapShot
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	DPrintf("IN INSTALL_SNAP*************************")
-	defer DPrintf("INSTALL_SNAP: {Node %v}'s state is {state %v,term %v,commitIndex %v,lastApplied %v} before processing InstallSnapshotRequest %v and reply InstallSnapshotResponse %v", rf.me, rf.serverState, rf.currentTerm, rf.commitIndex, rf.lastApplied, args, reply)
+	defer DPrintf("INSTALL_SNAP: Server %v's state is {state %v,term %v,commitIndex %v,lastApplied %v} before processing InstallSnapshotRequest %v and reply InstallSnapshotResponse %v", rf.me, rf.serverState, rf.currentTerm, rf.commitIndex, rf.lastApplied, args, reply)
 
 	if args.Term < rf.currentTerm {
 		return
