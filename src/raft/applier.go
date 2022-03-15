@@ -10,8 +10,8 @@ func (rf *Raft) applier() {
 		}
 		commitIndex, lastApplied := rf.commitIndex, rf.lastApplied
 		entries := make([]LogEtry, commitIndex-lastApplied)
-		first := int(math.Max(float64(0), float64(rf.lastApplied-rf.lastLogIndexNotIncluded)))
-		last := int(math.Min(float64(len(rf.log)), float64(rf.commitIndex-rf.lastLogIndexNotIncluded)))
+		first := int(math.Max(float64(0), float64(rf.getLogIdxOfLogicalIdx(rf.lastApplied+1))))
+		last := int(math.Min(float64(len(rf.log)), float64(rf.getLogIdxOfLogicalIdx(rf.commitIndex+1))))
 		DPrintf("APPLIER: Server %v, first: %v, last: %v", rf.me, first, last)
 		if first < last {
 			copy(entries, rf.log[first:last])
