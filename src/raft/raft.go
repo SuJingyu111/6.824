@@ -281,7 +281,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, vote *int) bo
 		if reply.Term == rf.currentTerm && reply.VoteGranted {
 			*vote++
 			if *vote > len(rf.peers)/2 && rf.currentTerm == args.Term && rf.serverState == CANDIDATE {
-				DPrintf("SD_RQ_VOTE: candidate %v is now leader, log length: %v-----------------------", rf.me, rf.getLastLogIndex()+1)
+				DPrintf("SD_RQ_VOTE: candidate %v is now leader, total log length: %v-----------------------", rf.me, rf.getLastLogIndex()+1)
 				DPrintf("SD_RQ_VOTE: candidate %v is now leader, log content: %v-----------------------", rf.me, rf.log)
 				rf.elected()
 				rf.sendHeartBeat()
@@ -326,7 +326,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.log = append(rf.log, newEntry)
 	rf.persist()
 	rf.matchIndex[rf.me] = index
-	DPrintf("START: Leader %v received command from client, log length: %v", rf.me, index+1)
+	DPrintf("START: Leader %v received command from client, total log length: %v", rf.me, index+1)
 	return index, term, isLeader
 }
 
@@ -416,7 +416,7 @@ func (rf *Raft) sendHeartBeat() {
 				reply := InstallSnapShotReply{}
 				go rf.sendInstallSnapshot(server, &args, &reply)
 			} else {
-				startIdx := nextIdx - rf.lastLogIndexNotIncluded - 1
+				startIdx := rf.getLogIdxOfLogicalIdx(nextIdx)
 				DPrintf("SD_HEART_BEAT: start Idx: %v", startIdx)
 				copy(entries, rf.log[startIdx:])
 				prevLogTerm := rf.lastLogTermNotIncluded
