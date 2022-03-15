@@ -16,7 +16,6 @@ func (rf *Raft) applier() {
 		if first < last {
 			copy(entries, rf.log[first:last])
 		}
-		//rf.lastApplied = entries[len(entries)-1].Index
 		rf.lastApplied = lastApplied + len(entries)
 		rf.mu.Unlock()
 		for idx, entry := range entries {
