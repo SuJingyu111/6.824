@@ -40,11 +40,13 @@ func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int,
 
 	if lastIncludedIndex > rf.getLastLogIndex() {
 		rf.log = make([]LogEtry, 0)
+		DPrintf("")
 	} else {
 		rf.trimLog(lastIncludedIndex)
 	}
 	rf.lastApplied, rf.commitIndex = lastIncludedIndex, lastIncludedIndex
 	rf.lastLogIndexNotIncluded, rf.lastLogTermNotIncluded = lastIncludedIndex, lastIncludedTerm
+	//rf.persist()
 
 	rf.persister.SaveStateAndSnapshot(rf.serializeState(), snapshot)
 	DPrintf("COND_SNAP: Server %v after install: lastApplied: %v, commitIndex: %v, log: %v", rf.me, rf.lastApplied, rf.commitIndex, rf.log)
@@ -73,6 +75,7 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 }
 
 func (rf *Raft) trimLog(index int) {
+	//TODO: LEAVE ONE DUMMY LOG AT THE HEAD TO WORK WITH THE FIRST LOG IN MAKE.
 	DPrintf("TRIM: Log content of server %v before trim up to index %v: %v", rf.me, index, rf.log)
 	DPrintf("TRIM: lastLogIndexNotIncluded: %v, index: %v, log length: %v", rf.lastLogTermNotIncluded, index, len(rf.log))
 	DPrintf("TRIM: last real index: %v", index-rf.lastLogIndexNotIncluded-1)
@@ -83,6 +86,7 @@ func (rf *Raft) trimLog(index int) {
 	rf.log = newLog
 	rf.lastLogIndexNotIncluded = index
 	rf.persist()
+	//rf.log = append([]LogEtry{}, rf.log[index-rf.lastLogIndexNotIncluded:]...)
 	DPrintf("TRIM: Log content of server %v after trim up to index %v: %v", rf.me, index, rf.log)
 }
 
@@ -92,6 +96,8 @@ func (rf *Raft) serializeState() []byte {
 	e.Encode(rf.currentTerm)
 	e.Encode(rf.votedFor)
 	e.Encode(rf.log)
+	//e.Encode(rf.lastLogIndexNotIncluded)
+	//e.Encode(rf.lastLogTermNotIncluded)
 	return w.Bytes()
 }
 
@@ -107,18 +113,22 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapShotArg, reply *InstallSnapShot
 
 	if args.Term > rf.currentTerm {
 		rf.newTerm(args.Term)
+		//rf.persist()
 	}
 	rf.resetTimeAndTimeOut()
 	reply.Term = rf.currentTerm
+	// outdated snapshot
 	if args.LastIncludedIndex <= rf.commitIndex {
 		return
 	}
+	//go func() {
 	rf.applyCh <- ApplyMsg{
 		SnapshotValid: true,
 		Snapshot:      args.Data,
 		SnapshotTerm:  args.LastIncludedTerm,
 		SnapshotIndex: args.LastIncludedIndex,
 	}
+	//}()
 }
 
 func (rf *Raft) sendInstallSnapshot(server int, args *InstallSnapShotArg, reply *InstallSnapShotReply) bool {

@@ -16,6 +16,8 @@ type AppendEntryArgs struct {
 	Entries     []LogEtry
 
 	LeaderCommit int
+
+	//IsHeartBeat bool
 }
 
 type AppendEntryReply struct {
@@ -105,6 +107,8 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 				rf.log = rf.log[:args.PrevLogIndex+1-rf.lastLogIndexNotIncluded-1]
 				rf.log = append(rf.log, args.Entries...)
 			} else if args.PrevLogIndex == rf.lastLogIndexNotIncluded {
+				//rf.log = make([]LogEtry, 0)
+				//rf.log = append(rf.log, args.Entries...)
 				rf.log = args.Entries
 			} else {
 				if len(rf.log) == 0 {
@@ -120,6 +124,7 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 			rf.persist()
 			DPrintf("APP_ENTRY: Server %v append entries, current log length: %v", rf.me, rf.getLastLogIndex()+1)
 			DPrintf("APP_ENTRY: Server %v new log after append: %v", rf.me, rf.log)
+			//DPrintf("Log content: %v", rf.log)
 			reply.Term = rf.currentTerm
 			reply.Success = true
 		}
@@ -127,7 +132,9 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 		//Check commit index & apply
 		if rf.commitIndex < args.LeaderCommit {
 			DPrintf("IN APP ENTRY***")
+			//prevCommitIdx := rf.commitIndex
 			rf.commitIndex = int(math.Min(float64(args.LeaderCommit), float64(rf.getLastLogIndex())))
+			//rf.commit(rf.commitIndex, prevCommitIdx)
 			rf.applyCond.Broadcast()
 		} else {
 			DPrintf("Server %v cannot commit", rf.me)
@@ -147,6 +154,7 @@ func (rf *Raft) commitHandler() {
 	prevCommitIndex := rf.commitIndex
 	if newCommitIndex > rf.lastLogIndexNotIncluded && newCommitIndex < rf.getLastLogIndex()+1 && rf.log[newCommitIndex-rf.lastLogIndexNotIncluded-1].Term == rf.currentTerm && newCommitIndex > rf.commitIndex {
 		rf.commitIndex = newCommitIndex
+		//rf.commit(newCommitIndex, prevCommitIndex)
 		rf.applyCond.Broadcast()
 		//rf.sendHeartBeat()
 	} else {
@@ -162,8 +170,28 @@ func (rf *Raft) getMajorReplicatedIndex() int {
 	return logCpy[len(logCpy)/2]
 }
 
+/*
+func (rf *Raft) apply(commitIdx int, prevCommitIdx int) {
+	DPrintf("COMMIT: Server %v commits %v to %v", rf.me, prevCommitIdx, commitIdx)
+	//DPrintf("COMMIT: Server %v current log: %v", rf.me, rf.log)
+	for i := prevCommitIdx + 1; i <= commitIdx; i++ {
+		thisCommitIdx := i
+		//DPrintf("COMMIT: Server %v commits %v to %v", rf.me, prevCommitIdx, commitIdx)
+		commandIdx := int(math.Max(float64(0), float64(thisCommitIdx-rf.lastLogIndexNotIncluded-1)))
+		applyMsg := ApplyMsg{
+			CommandValid: true,
+			Command:      rf.log[commandIdx].Command,
+			CommandIndex: thisCommitIdx,
+		}
+		rf.applyCh <- applyMsg
+		//DPrintf("COMMIT: Server %v applied log %v with CommandIndex: %v,apply msg: %v", rf.me, thisCommitIdx, applyMsg.CommandIndex, applyMsg)
+		DPrintf("COMMIT: Server %v applied log %v with CommandIndex: %v", rf.me, thisCommitIdx, applyMsg.CommandIndex)
+	}
+}*/
+
 func (rf *Raft) applyInit() {
 	DPrintf("APPLY_INIT: Server %v", rf.me)
+	//DPrintf("COMMIT: Server %v current log: %v", rf.me, rf.log)
 	applyMsg := ApplyMsg{
 		CommandValid: true,
 		Command:      0,
