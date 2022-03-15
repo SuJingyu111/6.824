@@ -1,5 +1,7 @@
 package raft
 
+import "log"
+
 //This is not locked! Check lock in outer scope!
 func (rf *Raft) getLastLogIndex() int {
 	if len(rf.log) == 0 {
@@ -30,4 +32,12 @@ func (rf *Raft) getFirstLogTerm() int {
 		return rf.lastLogTermNotIncluded
 	}
 	return rf.log[0].Term
+}
+
+//Translate from absolute idx to idx in log
+func (rf *Raft) getLogIdxOfLogicalIdx(logicalIdx int) int {
+	if logicalIdx <= rf.lastLogIndexNotIncluded {
+		log.Panic("getLogIdxOfLogicalIdx: logicalIdx <= rf.lastLogIndexNotIncluded")
+	}
+	return logicalIdx - rf.lastLogIndexNotIncluded - 1
 }
