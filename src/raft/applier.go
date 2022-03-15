@@ -18,6 +18,7 @@ func (rf *Raft) applier() {
 		}
 		rf.lastApplied = lastApplied + len(entries)
 		rf.mu.Unlock()
+		rf.appluMu.Lock()
 		for idx, entry := range entries {
 			rf.applyCh <- ApplyMsg{
 				CommandValid: true,
@@ -26,6 +27,7 @@ func (rf *Raft) applier() {
 			}
 			DPrintf("APPLIER: Server %v applied entry with real index %v and content %v", rf.me, lastApplied+idx+1, entry.Command)
 		}
+		rf.appluMu.Unlock()
 		/*
 			rf.mu.Lock()
 
