@@ -45,10 +45,10 @@ func (rf *Raft) sendAppendEntry(server int, args *AppendEntryArgs, reply *Append
 				rf.nextIndex[server] = args.PrevLogIndex
 				nextTerm := rf.lastLogTermNotIncluded
 				if rf.nextIndex[server] > rf.lastLogIndexNotIncluded {
-					nextTerm = rf.log[rf.nextIndex[server]-rf.lastLogIndexNotIncluded-1].Term
+					nextTerm = rf.log[rf.getLogIdxOfLogicalIdx(rf.nextIndex[server])].Term
 				}
 				DPrintf("SD_APP_ENTRY: nextIdx of server %v: %v, term of next idx: %v", server, rf.nextIndex[server], nextTerm)
-				for rf.nextIndex[server] > rf.lastLogIndexNotIncluded && rf.log[rf.nextIndex[server]-rf.lastLogIndexNotIncluded-1].Term == nextTerm {
+				for rf.nextIndex[server] > rf.lastLogIndexNotIncluded && rf.log[rf.getLogIdxOfLogicalIdx(rf.nextIndex[server])].Term == nextTerm {
 					rf.nextIndex[server] = rf.nextIndex[server] - 1
 				}
 				DPrintf("SD_APP_ENTRY: nextIdx of server %v: %v", server, rf.nextIndex[server])
@@ -90,7 +90,7 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 		}
 		//TODO: MODIFY HERE
 		if args.PrevLogIndex >= rf.getLastLogIndex()+1 || (args.PrevLogIndex == rf.lastLogIndexNotIncluded && args.PrevLogTerm != rf.lastLogTermNotIncluded) ||
-			(args.PrevLogIndex > rf.lastLogIndexNotIncluded && rf.log[args.PrevLogIndex-rf.lastLogIndexNotIncluded-1].Term != args.PrevLogTerm) {
+			(args.PrevLogIndex > rf.lastLogIndexNotIncluded && rf.log[rf.getLogIdxOfLogicalIdx(args.PrevLogIndex)].Term != args.PrevLogTerm) {
 			DPrintf("APP_ENTRY: Server %v refused log append from leader %v", rf.me, args.LeaderId)
 			DPrintf("APP_ENTRY: For Server %v, parameters: args.PrevLogIndex: %v, rf.getLastLogIndex()+1: %v, rf.lastLogIndexNotIncluded: %v, "+
 				"rf.lastLogTermNotIncluded: %v", rf.me, args.PrevLogIndex, rf.getLastLogIndex()+1, rf.lastLogIndexNotIncluded, rf.lastLogTermNotIncluded)
@@ -102,7 +102,7 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 			DPrintf("APP_ENTRY: args.PrevLogIndex %v, rf.lastLogIndexNotIncluded %v, rf.getFirstLogIndex() %v", args.PrevLogIndex, rf.lastLogIndexNotIncluded, rf.getFirstLogIndex())
 			DPrintf("APP_ENTRY: Server %v ,log content before append: %v", rf.me, rf.log)
 			if args.PrevLogIndex > rf.lastLogIndexNotIncluded {
-				rf.log = rf.log[:args.PrevLogIndex+1-rf.lastLogIndexNotIncluded-1]
+				rf.log = rf.log[:rf.getLogIdxOfLogicalIdx(args.PrevLogIndex+1)]
 				rf.log = append(rf.log, args.Entries...)
 			} else if args.PrevLogIndex == rf.lastLogIndexNotIncluded {
 				rf.log = args.Entries
@@ -143,7 +143,7 @@ func (rf *Raft) commitHandler() {
 	DPrintf("IN COMMIT HANDLER***")
 	newCommitIndex := rf.getMajorReplicatedIndex()
 	prevCommitIndex := rf.commitIndex
-	if newCommitIndex > rf.lastLogIndexNotIncluded && newCommitIndex < rf.getLastLogIndex()+1 && rf.log[newCommitIndex-rf.lastLogIndexNotIncluded-1].Term == rf.currentTerm && newCommitIndex > rf.commitIndex {
+	if newCommitIndex > rf.lastLogIndexNotIncluded && newCommitIndex < rf.getLastLogIndex()+1 && rf.log[rf.getLogIdxOfLogicalIdx(newCommitIndex)].Term == rf.currentTerm && newCommitIndex > rf.commitIndex {
 		rf.commitIndex = newCommitIndex
 		rf.applyCond.Broadcast()
 	} else {
