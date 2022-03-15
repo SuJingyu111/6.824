@@ -139,6 +139,15 @@ func (rf *Raft) persist() {
 	// e.Encode(rf.yyy)
 	// data := w.Bytes()
 	// rf.persister.SaveRaftState(data)
+	/*
+		w := new(bytes.Buffer)
+		e := labgob.NewEncoder(w)
+		e.Encode(rf.currentTerm)
+		e.Encode(rf.votedFor)
+		e.Encode(rf.log)
+		e.Encode(rf.lastLogIndexNotIncluded)
+		e.Encode(rf.lastLogTermNotIncluded)
+	*/
 	data := rf.serializeState()
 	rf.persister.SaveRaftState(data)
 }
@@ -168,6 +177,8 @@ func (rf *Raft) readPersist(data []byte) {
 	var currentTerm int
 	var voterdFor int
 	var persistLog []LogEtry
+	//var lastLogIndexNotIncluded int
+	//var lastLogTermNotIncluded int
 	if d.Decode(&currentTerm) != nil ||
 		d.Decode(&voterdFor) != nil || d.Decode(&persistLog) != nil { //|| d.Decode(&lastLogIndexNotIncluded) != nil || d.Decode(&lastLogTermNotIncluded) != nil
 		DPrintf("read persist went wrong!")
@@ -175,6 +186,10 @@ func (rf *Raft) readPersist(data []byte) {
 		rf.currentTerm = currentTerm
 		rf.votedFor = voterdFor
 		rf.log = persistLog
+		//rf.lastLogTermNotIncluded = lastLogTermNotIncluded
+		//rf.lastLogIndexNotIncluded = lastLogIndexNotIncluded
+		//rf.lastApplied = int(math.Max(float64(rf.lastApplied), float64(rf.lastLogIndexNotIncluded)))
+		//rf.commitIndex = int(math.Max(float64(rf.commitIndex), float64(rf.lastApplied)))
 	}
 }
 
@@ -252,6 +267,8 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		(lastLogTerm == args.LastLogTerm && lastLogIndex <= args.LastLogIndex)
 	DPrintf("RQVOTE: server %v receive rqvote rpc from server %v in term %v, eligible: %v",
 		rf.me, args.CandidateId, args.Term, candidateEligible)
+	//DPrintf("last log Term: %v, args.Term: %v, this log length: %v, args log index: args.LastLogIndex: %v",
+	//lastLogTerm, args.Term, len(rf.log)-1, args.LastLogIndex)
 
 	if rf.currentTerm <= args.Term && candidateEligible && (rf.votedFor == HaveNotVoted || rf.votedFor == args.CandidateId) {
 		rf.votedFor = args.CandidateId
@@ -354,11 +371,13 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	newEntry := LogEtry{
 		Term:    term,
 		Command: command,
+		//Index:   index,
 	}
 	rf.log = append(rf.log, newEntry)
 	rf.persist()
 	rf.matchIndex[rf.me] = index
 	DPrintf("START: Leader %v received command from client, log length: %v", rf.me, index+1)
+	//DPrintf("Log content: %v", rf.log)
 	return index, term, isLeader
 }
 
@@ -424,6 +443,7 @@ func (rf *Raft) resetTimeAndTimeOut() {
 
 //Send heartBeat
 func (rf *Raft) sendHeartBeat() {
+	//rf.electionCond.L.Unlock()
 	for i := range rf.peers {
 		if !(rf.serverState == LEADER) || rf.killed() {
 			break
@@ -450,6 +470,7 @@ func (rf *Raft) sendHeartBeat() {
 				startIdx := nextIdx - rf.lastLogIndexNotIncluded - 1
 				DPrintf("SD_HEART_BEAT: start Idx: %v", startIdx)
 				copy(entries, rf.log[startIdx:])
+				//DPrintf("SD_HEART_BEAT: entries: %v", entries)
 				prevLogTerm := rf.lastLogTermNotIncluded
 				if startIdx > 0 {
 					prevLogTerm = rf.log[startIdx-1].Term
@@ -551,7 +572,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.nextIndex = make([]int, len(peers))
 	rf.matchIndex = make([]int, len(peers))
 
-	//2D last log info.
+	//2D last log info. Persisted for recovery
 	rf.lastLogIndexNotIncluded = -1
 	rf.lastLogTermNotIncluded = -1
 
@@ -559,7 +580,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
-	// Applier goroutine
+	//rf.apply(0, -1)
 	go rf.applier()
 
 	// start ticker goroutine to start elections
