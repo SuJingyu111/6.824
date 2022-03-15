@@ -75,12 +75,12 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 
 func (rf *Raft) trimLog(index int) {
 	DPrintf("TRIM: Log content of server %v before trim up to index %v: %v", rf.me, index, rf.log)
-	DPrintf("TRIM: lastLogIndexNotIncluded: %v, index: %v, log length: %v", rf.lastLogTermNotIncluded, index, len(rf.log))
-	DPrintf("TRIM: last real index: %v", index-rf.lastLogIndexNotIncluded-1)
-	rf.lastLogTermNotIncluded = rf.log[index-rf.lastLogIndexNotIncluded-1].Term
+	DPrintf("TRIM: lastLogIndexNotIncluded: %v, index: %v, on-the-fly log length: %v", rf.lastLogTermNotIncluded, index, rf.getLogLengthNotInSnapshot())
+	DPrintf("TRIM: last real index: %v", rf.getLogIdxOfLogicalIdx(index))
+	rf.lastLogTermNotIncluded = rf.log[rf.getLogIdxOfLogicalIdx(index)].Term
 	newLog := make([]LogEtry, rf.getLastLogIndex()-index)
-	copy(newLog, rf.log[index-rf.lastLogIndexNotIncluded:])
-	DPrintf("TRIM: new log: %v, supposed content: %v", newLog, rf.log[index-rf.lastLogIndexNotIncluded:])
+	copy(newLog, rf.log[rf.getLogIdxOfLogicalIdx(index+1):])
+	DPrintf("TRIM: new log: %v, supposed content: %v", newLog, rf.log[rf.getLogIdxOfLogicalIdx(index+1):])
 	rf.log = newLog
 	rf.lastLogIndexNotIncluded = index
 	rf.persist()
