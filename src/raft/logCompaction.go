@@ -31,10 +31,10 @@ func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int,
 	}
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	DPrintf("COND_SNAP: Server %v  service calls CondInstallSnapshot with lastIncludedTerm %v and lastIncludedIndex %v to check whether snapshot is still valid in term %v", rf.me, lastIncludedTerm, lastIncludedIndex, rf.currentTerm)
+	DPrintf("COND_SNAP: Server %v  service calls CondInstallSnapshot with lastIncludedTerm %v and lastIncludedIndex %v in term %v", rf.me, lastIncludedTerm, lastIncludedIndex, rf.currentTerm)
 
 	if lastIncludedIndex <= rf.commitIndex {
-		DPrintf("COND_SNAP: Server %v rejects the snapshot which lastIncludedIndex is %v because commitIndex %v is larger", rf.me, lastIncludedIndex, rf.commitIndex)
+		DPrintf("COND_SNAP: Server %v rejects the snapshot with lastIncludedIndex is %v because commitIndex %v is larger", rf.me, lastIncludedIndex, rf.commitIndex)
 		return false
 	}
 
@@ -65,12 +65,12 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	defer rf.mu.Unlock()
 	DPrintf("IN SNAPSHOT****************")
 	if index <= rf.lastLogIndexNotIncluded {
-		DPrintf("SNAP SHOT: Server %v rejects replacing log with snapshotIndex %v as current snapshotIndex %v is larger in term %v", rf.me, index, rf.lastLogIndexNotIncluded, rf.currentTerm)
+		DPrintf("SNAPSHOT: Server %v rejects Snapshot with snapshotIndex %v, current snapshotIndex %v is larger in term %v", rf.me, index, rf.lastLogIndexNotIncluded, rf.currentTerm)
 		return
 	}
 	rf.trimLog(index)
 	rf.persister.SaveStateAndSnapshot(rf.serializeState(), snapshot)
-	DPrintf("SNAP SHOT: Server %v's state is state %v,term %v,commitIndex %v,lastApplied %v after replacing log with snapshotIndex %v as old snapshotIndex %v is smaller", rf.me, rf.serverState, rf.currentTerm, rf.commitIndex, rf.lastApplied, index, rf.lastLogIndexNotIncluded)
+	DPrintf("SNAPSHOT: Server %v's state is state %v,term %v,commitIndex %v,lastApplied %v snapshot snapshotIndex %v and old snapshotIndex %v", rf.me, rf.serverState, rf.currentTerm, rf.commitIndex, rf.lastApplied, index, rf.lastLogIndexNotIncluded)
 }
 
 func (rf *Raft) trimLog(index int) {

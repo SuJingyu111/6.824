@@ -41,3 +41,13 @@ func (rf *Raft) getLogIdxOfLogicalIdx(logicalIdx int) int {
 	}
 	return logicalIdx - rf.lastLogIndexNotIncluded - 1
 }
+
+//Get log length from start
+func (rf *Raft) getTotalLogLength() int {
+	return rf.lastLogIndexNotIncluded + len(rf.log) + 1
+}
+
+//Get log length not trimmed
+func (rf *Raft) getLogLengthNotInSnapshot() int {
+	return len(rf.log)
+}
