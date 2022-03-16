@@ -361,7 +361,7 @@ func (rf *Raft) ticker() {
 		// be started and to randomize sleeping time using
 		// time.Sleep().
 		rf.tick()
-		sleepTime := rand.Intn(100) + 100
+		sleepTime := rand.Intn(50) + 50
 		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 	}
 }

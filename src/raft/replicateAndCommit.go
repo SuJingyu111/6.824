@@ -88,7 +88,6 @@ func (rf *Raft) AppendEntry(args *AppendEntryArgs, reply *AppendEntryReply) {
 		if args.PrevLogIndex < rf.getLastLogIndex()+1 {
 			//DPrintf("APP_ENTRY: Server %v pervLogTerm: %v", rf.me, rf.log[args.PrevLogIndex].Term)
 		}
-		//TODO: MODIFY HERE
 		if args.PrevLogIndex >= rf.getLastLogIndex()+1 || (args.PrevLogIndex == rf.lastLogIndexNotIncluded && args.PrevLogTerm != rf.lastLogTermNotIncluded) ||
 			(args.PrevLogIndex > rf.lastLogIndexNotIncluded && rf.log[rf.getLogIdxOfLogicalIdx(args.PrevLogIndex)].Term != args.PrevLogTerm) {
 			DPrintf("APP_ENTRY: Server %v refused log append from leader %v", rf.me, args.LeaderId)
