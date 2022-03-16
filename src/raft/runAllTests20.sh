@@ -1,6 +1,6 @@
 #! /bin/bash
 
-for i in {0..50}
+for i in {0..20}
   do
   echo "$i"
   name=test-$i
