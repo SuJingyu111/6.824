@@ -525,7 +525,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.lastLogIndexNotIncluded = -1
 	rf.lastLogTermNotIncluded = -1
 
-	rf.applyInit()
+	//rf.applyInit()
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
