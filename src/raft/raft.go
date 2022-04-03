@@ -71,8 +71,8 @@ const (
 const HaveNotVoted int = -1
 
 const (
-	ElectionTimeBase         int = 500
-	ElectionTimeRandInterval int = 300
+	ElectionTimeBase         int = 100
+	ElectionTimeRandInterval int = 100
 )
 
 //
@@ -361,7 +361,7 @@ func (rf *Raft) ticker() {
 		// be started and to randomize sleeping time using
 		// time.Sleep().
 		rf.tick()
-		sleepTime := rand.Intn(50) + 50
+		sleepTime := rand.Intn(10) + 10
 		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 	}
 }
