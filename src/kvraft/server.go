@@ -18,10 +18,24 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 	return
 }
 
+//Operation types
+const (
+	GET    int = 0
+	PUT    int = 1
+	APPEND int = 2
+)
+
 type Op struct {
 	// Your definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
+	Type  int
+	Key   string
+	Value string
+
+	//Dup elimination
+	clientId int
+	cmdId    int
 }
 
 type KVServer struct {
