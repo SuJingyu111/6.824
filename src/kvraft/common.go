@@ -15,7 +15,9 @@ type PutAppendArgs struct {
 	Op    string // "Put" or "Append"
 	// You'll have to add definitions here.
 	// Field names must start with capital letters,
-	// otherwise RPC will break.
+	// otherwise RPC will break.b
+	clientId int
+	cmdId    int
 }
 
 type PutAppendReply struct {
@@ -25,6 +27,8 @@ type PutAppendReply struct {
 type GetArgs struct {
 	Key string
 	// You'll have to add definitions here.
+	clientId int
+	cmdId    int
 }
 
 type GetReply struct {
