@@ -20,9 +20,8 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 
 //Operation types
 const (
-	GET    int = 0
-	PUT    int = 1
-	APPEND int = 2
+	PUT    string = "Put"
+	APPEND string = "Append"
 )
 
 type Op struct {
