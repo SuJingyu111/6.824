@@ -33,8 +33,8 @@ type Op struct {
 	Value string
 
 	//Dup elimination
-	clientId int
-	cmdId    int
+	ClientId int
+	CmdId    int
 }
 
 type KVServer struct {
