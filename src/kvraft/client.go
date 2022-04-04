@@ -95,6 +95,33 @@ func (ck *Clerk) Get(key string) string {
 //
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 	// You will have to modify this function.
+
+	// You will have to modify this function.
+	ck.mu.Lock()
+	thisCmdId := ck.cmdId
+	ck.cmdId += 1
+	thisClientId := ck.clientId
+	thisLeaderId := ck.lastACKedLeaderId
+	ck.mu.Unlock()
+
+	DPrintf("PUT_APPEND: client %v put/append operation, cmdId: %v, lastAckedLeaderId: %v, operation: %v, key: %v, "+
+		"value: %v", thisClientId, thisCmdId, thisLeaderId, op, key, value)
+	args := PutAppendArgs{
+		Key:      key,
+		Value:    value,
+		Op:       op,
+		clientId: int(thisClientId),
+		cmdId:    int(thisCmdId),
+	}
+
+	for {
+		reply := GetReply{}
+		ok := ck.servers[thisLeaderId].Call("KVServer.Get", &args, &reply)
+		if ok && !(reply.Err == ErrWrongLeader) {
+			break
+		}
+	}
+
 }
 
 func (ck *Clerk) Put(key string, value string) {
