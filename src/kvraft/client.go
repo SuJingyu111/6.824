@@ -1,6 +1,10 @@
 package kvraft
 
-import "6.824/labrpc"
+import (
+	"6.824/labrpc"
+	"sync"
+	"sync/atomic"
+)
 import "crypto/rand"
 import "math/big"
 
@@ -10,6 +14,8 @@ type Clerk struct {
 	clientId          int64
 	lastACKedLeaderId int64
 	cmdId             int64
+
+	mu sync.Mutex
 }
 
 func nrand() int64 {
@@ -44,6 +50,36 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 func (ck *Clerk) Get(key string) string {
 
 	// You will have to modify this function.
+	ck.mu.Lock()
+	thisCmdId := ck.cmdId
+	ck.cmdId += 1
+	thisClientId := ck.clientId
+	thisLeaderId := ck.lastACKedLeaderId
+	ck.mu.Unlock()
+
+	DPrintf("GET: client %v get operation, cmdId: %v, lastAckedLeaderId: %v", thisClientId, thisCmdId, thisLeaderId)
+	args := GetArgs{
+		Key:      key,
+		clientId: int(thisClientId),
+		cmdId:    int(thisCmdId),
+	}
+
+	for {
+		reply := GetReply{}
+		ok := ck.servers[thisLeaderId].Call("KVServer.Get", &args, &reply)
+		if ok {
+			if reply.Err == OK {
+				atomic.StoreInt64(&ck.lastACKedLeaderId, thisLeaderId)
+				return reply.Value
+			} else if reply.Err == ErrNoKey {
+				atomic.StoreInt64(&ck.lastACKedLeaderId, thisLeaderId)
+				return ""
+			} else {
+				thisLeaderId = (thisLeaderId + 1) % int64(len(ck.servers))
+			}
+		}
+	}
+
 	return ""
 }
 
