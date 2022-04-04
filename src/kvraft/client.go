@@ -60,8 +60,8 @@ func (ck *Clerk) Get(key string) string {
 	DPrintf("GET: client %v get operation, cmdId: %v, lastAckedLeaderId: %v", thisClientId, thisCmdId, thisLeaderId)
 	args := GetArgs{
 		Key:      key,
-		clientId: int(thisClientId),
-		cmdId:    int(thisCmdId),
+		ClientId: int(thisClientId),
+		CmdId:    int(thisCmdId),
 	}
 
 	for {
@@ -110,15 +110,18 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		Key:      key,
 		Value:    value,
 		Op:       op,
-		clientId: int(thisClientId),
-		cmdId:    int(thisCmdId),
+		ClientId: int(thisClientId),
+		CmdId:    int(thisCmdId),
 	}
 
 	for {
-		reply := GetReply{}
-		ok := ck.servers[thisLeaderId].Call("KVServer.Get", &args, &reply)
+		reply := PutAppendReply{}
+		ok := ck.servers[thisLeaderId].Call("KVServer.PutAppend", &args, &reply)
 		if ok && !(reply.Err == ErrWrongLeader) {
+			atomic.StoreInt64(&ck.lastACKedLeaderId, thisLeaderId)
 			break
+		} else {
+			thisLeaderId = (thisLeaderId + 1) % int64(len(ck.servers))
 		}
 	}
 
