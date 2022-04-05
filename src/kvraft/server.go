@@ -47,6 +47,9 @@ type KVServer struct {
 	maxraftstate int // snapshot if log grows this big
 
 	// Your definitions here.
+	kvStorage      map[string]string
+	clientCmdIdMap map[int64]int64
+	opResultMap    map[int]Op
 }
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
@@ -107,6 +110,15 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
 
 	// You may need initialization code here.
+	kv.kvStorage = make(map[string]string)
+	kv.clientCmdIdMap = make(map[int64]int64)
+	kv.opResultMap = make(map[int]Op)
+
+	go kv.applier()
 
 	return kv
+}
+
+func (kv *KVServer) applier() {
+	//TODO
 }
