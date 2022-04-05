@@ -37,6 +37,12 @@ type Op struct {
 	CmdId    int
 }
 
+type OpResult struct {
+	ClientId int
+	CmdId    int
+	Err      string
+}
+
 type KVServer struct {
 	mu      sync.Mutex
 	me      int
@@ -49,7 +55,7 @@ type KVServer struct {
 	// Your definitions here.
 	kvStorage      map[string]string
 	clientCmdIdMap map[int64]int64
-	opResultMap    map[int]Op
+	opResultMap    map[int]chan OpResult
 }
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
@@ -112,7 +118,7 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	// You may need initialization code here.
 	kv.kvStorage = make(map[string]string)
 	kv.clientCmdIdMap = make(map[int64]int64)
-	kv.opResultMap = make(map[int]Op)
+	kv.opResultMap = make(map[int]chan OpResult)
 
 	go kv.applier()
 
