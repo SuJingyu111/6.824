@@ -60,8 +60,8 @@ func (ck *Clerk) Get(key string) string {
 	DPrintf("GET: client %v get operation, cmdId: %v, lastAckedLeaderId: %v", thisClientId, thisCmdId, thisLeaderId)
 	args := GetArgs{
 		Key:      key,
-		ClientId: int(thisClientId),
-		CmdId:    int(thisCmdId),
+		ClientId: thisClientId,
+		CmdId:    thisCmdId,
 	}
 
 	for {
@@ -110,8 +110,8 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		Key:      key,
 		Value:    value,
 		Op:       op,
-		ClientId: int(thisClientId),
-		CmdId:    int(thisCmdId),
+		ClientId: thisClientId,
+		CmdId:    thisCmdId,
 	}
 
 	for {
