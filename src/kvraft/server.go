@@ -110,12 +110,16 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 		DPrintf("SERVER_GET: Timeout, ErrWrongLeader: GET op with CmdId %v and key %v from client %v", args.CmdId, args.Key, args.ClientId)
 		reply.Err = ErrWrongLeader
 	}
-	/*
-		kv.mu.Lock()
-		kv.deleteChanAtIdx(index)
-		kv.mu.Unlock()
+	kv.mu.Lock()
+	kv.deleteChanAtIdx(index)
+	kv.mu.Unlock()
+}
 
-	*/
+func (kv *KVServer) deleteChanAtIdx(index int) {
+	_, ok := kv.finishedOpChans[index]
+	if ok {
+		delete(kv.finishedOpChans, index)
+	}
 }
 
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
