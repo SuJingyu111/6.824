@@ -43,6 +43,7 @@ type OpResult struct {
 	ClientId int
 	CmdId    int
 	Err      Err
+	Value    string
 }
 
 type KVServer struct {
@@ -60,6 +61,14 @@ type KVServer struct {
 	opResultMap    map[int]chan OpResult
 }
 
+func (kv *KVServer) registerChanAtIdx(index int) chan OpResult {
+	_, ok := kv.opResultMap[index]
+	if !ok {
+		kv.opResultMap[index] = make(chan OpResult, 1)
+	}
+	return kv.opResultMap[index]
+}
+
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	// Your code here.
 	op := Op{
@@ -74,10 +83,37 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 		return
 	}
 	kv.mu.Lock()
-	resChan, ok := kv.opResultMap[index]
-	if !ok {
-		kv.opResultMap[index] = make(chan OpResult, 1)
+	resChan := kv.registerChanAtIdx(index)
+	kv.mu.Unlock()
+	select {
+	case opRes := <-resChan:
+		if opRes.CmdId == args.CmdId && opRes.ClientId == args.ClientId {
+			reply.Err = opRes.Err
+			reply.Value = opRes.Value
+		} else {
+			reply.Err = ErrWrongLeader
+		}
+	case <-time.After(200 * time.Millisecond):
+		reply.Err = ErrWrongLeader
 	}
+}
+
+func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
+	// Your code here.
+	op := Op{
+		Type:     args.Op,
+		Key:      args.Key,
+		Value:    args.Value,
+		ClientId: args.ClientId,
+		CmdId:    args.CmdId,
+	}
+	index, _, isLeader := kv.rf.Start(op)
+	if !isLeader {
+		reply.Err = ErrWrongLeader
+		return
+	}
+	kv.mu.Lock()
+	resChan := kv.registerChanAtIdx(index)
 	kv.mu.Unlock()
 	select {
 	case opRes := <-resChan:
@@ -89,10 +125,6 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	case <-time.After(200 * time.Millisecond):
 		reply.Err = ErrWrongLeader
 	}
-}
-
-func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
-	// Your code here.
 }
 
 //
