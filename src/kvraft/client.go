@@ -79,8 +79,6 @@ func (ck *Clerk) Get(key string) string {
 			}
 		}
 	}
-
-	return ""
 }
 
 //
