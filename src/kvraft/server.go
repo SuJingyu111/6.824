@@ -7,6 +7,7 @@ import (
 	"log"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 const Debug = false
@@ -20,6 +21,7 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 
 //Operation types
 const (
+	GET    string = "Get"
 	PUT    string = "Put"
 	APPEND string = "Append"
 )
@@ -28,7 +30,7 @@ type Op struct {
 	// Your definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
-	Type  int
+	Type  string
 	Key   string
 	Value string
 
@@ -40,7 +42,7 @@ type Op struct {
 type OpResult struct {
 	ClientId int
 	CmdId    int
-	Err      string
+	Err      Err
 }
 
 type KVServer struct {
@@ -60,6 +62,33 @@ type KVServer struct {
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	// Your code here.
+	op := Op{
+		Type:     args.OpType,
+		Key:      args.Key,
+		ClientId: args.ClientId,
+		CmdId:    args.CmdId,
+	}
+	index, _, isLeader := kv.rf.Start(op)
+	if !isLeader {
+		reply.Err = ErrWrongLeader
+		return
+	}
+	kv.mu.Lock()
+	resChan, ok := kv.opResultMap[index]
+	if !ok {
+		kv.opResultMap[index] = make(chan OpResult, 1)
+	}
+	kv.mu.Unlock()
+	select {
+	case opRes := <-resChan:
+		if opRes.CmdId == args.CmdId && opRes.ClientId == args.ClientId {
+			reply.Err = opRes.Err
+		} else {
+			reply.Err = ErrWrongLeader
+		}
+	case <-time.After(200 * time.Millisecond):
+		reply.Err = ErrWrongLeader
+	}
 }
 
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {

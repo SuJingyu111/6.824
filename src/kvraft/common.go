@@ -29,6 +29,7 @@ type GetArgs struct {
 	// You'll have to add definitions here.
 	ClientId int
 	CmdId    int
+	OpType   string
 }
 
 type GetReply struct {
