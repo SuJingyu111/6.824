@@ -35,13 +35,13 @@ type Op struct {
 	Value string
 
 	//Dup elimination
-	ClientId int
-	CmdId    int
+	ClientId int64
+	CmdId    int64
 }
 
 type OpResult struct {
-	ClientId int
-	CmdId    int
+	ClientId int64
+	CmdId    int64
 	Err      Err
 	Value    string
 }
@@ -64,7 +64,7 @@ type KVServer struct {
 func (kv *KVServer) registerChanAtIdx(index int) chan OpResult {
 	_, ok := kv.opResultMap[index]
 	if !ok {
-		kv.opResultMap[index] = make(chan OpResult, 1)
+		kv.opResultMap[index] = make(chan OpResult)
 	}
 	return kv.opResultMap[index]
 }
@@ -117,6 +117,7 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	kv.mu.Unlock()
 	select {
 	case opRes := <-resChan:
+		reply.Err = opRes.Err
 		if opRes.CmdId == args.CmdId && opRes.ClientId == args.ClientId {
 			reply.Err = opRes.Err
 		} else {
@@ -188,4 +189,58 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 
 func (kv *KVServer) applier() {
 	//TODO
+	for !kv.killed() {
+		applyMsg := <-kv.applyCh
+		if applyMsg.CommandValid {
+			index := applyMsg.CommandIndex
+			op := applyMsg.Command.(Op)
+			opResult := OpResult{
+				ClientId: op.ClientId,
+				CmdId:    op.CmdId,
+			}
+			kv.mu.Lock()
+			if op.Type == GET {
+				opResult = kv.apply(&op)
+			} else {
+				lastCmdId, ok := kv.clientCmdIdMap[op.ClientId]
+				if !ok || lastCmdId < op.CmdId {
+					opResult = kv.apply(&op)
+					kv.clientCmdIdMap[op.ClientId] = op.CmdId
+				}
+			}
+			opResChan, ok := kv.opResultMap[index]
+			if !ok {
+				opResChan = make(chan OpResult)
+				kv.opResultMap[index] = opResChan
+			}
+			opResChan <- opResult
+			kv.mu.Unlock()
+		}
+	}
+}
+
+func (kv *KVServer) apply(op *Op) OpResult {
+	opResult := OpResult{
+		ClientId: op.ClientId,
+		CmdId:    op.CmdId,
+	}
+	if op.Type == GET {
+		value, ok := kv.kvStorage[op.Key]
+		if !ok {
+			opResult.Value = ""
+			opResult.Err = ErrNoKey
+		} else {
+			opResult.Value = value
+			opResult.Err = OK
+		}
+	} else if op.Type == PUT {
+		kv.kvStorage[op.Key] = op.Value
+		opResult.Err = OK
+	} else if op.Type == APPEND {
+		kv.kvStorage[op.Key] += op.Value
+		opResult.Err = OK
+	} else {
+		DPrintf("KV.APPLY: UNKNOWN OPERATION: %v", op.Type)
+	}
+	return opResult
 }
