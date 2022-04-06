@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Debug = true
+const Debug = false
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug {
@@ -67,7 +67,7 @@ type KVServer struct {
 func (kv *KVServer) registerChanAtIdx(index int) chan Op {
 	_, ok := kv.finishedOpChans[index]
 	if !ok {
-		kv.finishedOpChans[index] = make(chan Op)
+		kv.finishedOpChans[index] = make(chan Op, 1)
 	}
 	return kv.finishedOpChans[index]
 }
@@ -92,7 +92,7 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	kv.mu.Unlock()
 	select {
 	case finishedOp := <-resChan:
-		if op.CmdId == finishedOp.CmdId && op.ClientId == finishedOp.ClientId {
+		if op.CmdId == finishedOp.CmdId && op.ClientId == finishedOp.ClientId && kv.rf.IsLeader() {
 			if finishedOp.Value == "" {
 				reply.Err = ErrNoKey
 				reply.Value = ""
@@ -110,6 +110,12 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 		DPrintf("SERVER_GET: Timeout, ErrWrongLeader: GET op with CmdId %v and key %v from client %v", args.CmdId, args.Key, args.ClientId)
 		reply.Err = ErrWrongLeader
 	}
+	/*
+		kv.mu.Lock()
+		kv.deleteChanAtIdx(index)
+		kv.mu.Unlock()
+
+	*/
 }
 
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
@@ -128,12 +134,13 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 		reply.Err = ErrWrongLeader
 		return
 	}
+	DPrintf("SERVER_PUT_APPEND: HAS_LEADER: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
 	kv.mu.Lock()
 	resChan := kv.registerChanAtIdx(index)
 	kv.mu.Unlock()
 	select {
 	case finishedOp := <-resChan:
-		if op.CmdId == finishedOp.CmdId && op.ClientId == finishedOp.ClientId {
+		if op.CmdId == finishedOp.CmdId && op.ClientId == finishedOp.ClientId && kv.rf.IsLeader() {
 			DPrintf("SERVER_PUT_APPEND: OK: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
 			reply.Err = OK
 		} else {
@@ -205,32 +212,36 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	return kv
 }
 
+func (kv *KVServer) checkAndApply(op *Op) {
+	lastCmdId, ok := kv.clientCmdIdMap[op.ClientId]
+	if !ok || lastCmdId < op.CmdId {
+		kv.apply(op)
+		kv.clientCmdIdMap[op.ClientId] = op.CmdId
+	} else if op.Type == GET {
+		kv.apply(op)
+	}
+}
+
 func (kv *KVServer) applier() {
+
 	for !kv.killed() {
 		applyMsg := <-kv.applyCh
 		if applyMsg.CommandValid {
 			index := applyMsg.CommandIndex
 			op := applyMsg.Command.(Op)
 			kv.mu.Lock()
-			if op.Type == GET {
-				kv.apply(&op)
-			} else {
-				lastCmdId, ok := kv.clientCmdIdMap[op.ClientId]
-				if !ok || lastCmdId < op.CmdId {
-					kv.apply(&op)
-					kv.clientCmdIdMap[op.ClientId] = op.CmdId
-				}
-			}
+			kv.checkAndApply(&op)
 			opResChan, ok := kv.finishedOpChans[index]
 			if !ok {
-				opResChan = make(chan Op)
+				opResChan = make(chan Op, 1)
 				kv.finishedOpChans[index] = opResChan
 			}
-			opResChan <- op
 			kv.mu.Unlock()
+			opResChan <- op
 		} else if applyMsg.SnapshotValid {
 			//TODO: 3B
 		}
+
 	}
 }
 

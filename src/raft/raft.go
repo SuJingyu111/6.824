@@ -352,6 +352,12 @@ func (rf *Raft) killed() bool {
 	return z == 1
 }
 
+func (rf *Raft) IsLeader() bool {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	return rf.serverState == LEADER
+}
+
 // The ticker go routine starts a new election if this peer hasn't received
 // heartsbeats recently.
 func (rf *Raft) ticker() {
