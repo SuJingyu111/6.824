@@ -39,15 +39,12 @@ type Op struct {
 	CmdId    int64
 }
 
-/*
 type OpResult struct {
 	ClientId int64
 	CmdId    int64
 	Err      Err
 	Value    string
 }
-
-*/
 
 type KVServer struct {
 	mu      sync.Mutex
@@ -61,13 +58,13 @@ type KVServer struct {
 	// Your definitions here.
 	kvStorage       map[string]string
 	clientCmdIdMap  map[int64]int64
-	finishedOpChans map[int]chan Op
+	finishedOpChans map[int]chan OpResult
 }
 
-func (kv *KVServer) registerChanAtIdx(index int) chan Op {
+func (kv *KVServer) registerChanAtIdx(index int) chan OpResult {
 	_, ok := kv.finishedOpChans[index]
 	if !ok {
-		kv.finishedOpChans[index] = make(chan Op, 1)
+		kv.finishedOpChans[index] = make(chan OpResult, 1)
 	}
 	return kv.finishedOpChans[index]
 }
@@ -91,17 +88,21 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	resChan := kv.registerChanAtIdx(index)
 	kv.mu.Unlock()
 	select {
-	case finishedOp := <-resChan:
-		if op.CmdId == finishedOp.CmdId && op.ClientId == finishedOp.ClientId && kv.rf.IsLeader() {
-			if finishedOp.Value == "" {
-				reply.Err = ErrNoKey
-				reply.Value = ""
-				DPrintf("SERVER_GET: ErrNoKey: GET op with CmdId %v and key %v from client %v", args.CmdId, args.Key, args.ClientId)
-			} else {
-				DPrintf("SERVER_GET: OK: GET op with CmdId %v and key %v from client %v, value: %v", args.CmdId, args.Key, args.ClientId, finishedOp.Value)
-				reply.Err = OK
-				reply.Value = finishedOp.Value
-			}
+	case opResult := <-resChan:
+		if op.CmdId == opResult.CmdId && op.ClientId == opResult.ClientId && kv.rf.IsLeader() {
+			/*
+				if opResult.Value == "" {
+					reply.Err = ErrNoKey
+					reply.Value = ""
+					DPrintf("SERVER_GET: ErrNoKey: GET op with CmdId %v and key %v from client %v", args.CmdId, args.Key, args.ClientId)
+				} else {
+					DPrintf("SERVER_GET: OK: GET op with CmdId %v and key %v from client %v, value: %v", args.CmdId, args.Key, args.ClientId, opResult.Value)
+					reply.Err = OK
+					reply.Value = opResult.Value
+				}
+			*/
+			reply.Err = opResult.Err
+			reply.Value = opResult.Value
 		} else {
 			DPrintf("SERVER_GET: ErrWrongLeader: GET op with CmdId %v and key %v from client %v", args.CmdId, args.Key, args.ClientId)
 			reply.Err = ErrWrongLeader
@@ -155,6 +156,9 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 		DPrintf("SERVER_PUT_APPEND: ErrWrongLeader from TIMEOUT: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
 		reply.Err = ErrWrongLeader
 	}
+	kv.mu.Lock()
+	kv.deleteChanAtIdx(index)
+	kv.mu.Unlock()
 }
 
 //
@@ -209,21 +213,26 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	// You may need initialization code here.
 	kv.kvStorage = make(map[string]string)
 	kv.clientCmdIdMap = make(map[int64]int64)
-	kv.finishedOpChans = make(map[int]chan Op)
+	kv.finishedOpChans = make(map[int]chan OpResult)
 
 	go kv.applier()
 
 	return kv
 }
 
-func (kv *KVServer) checkAndApply(op *Op) {
+func (kv *KVServer) checkAndApply(op *Op) OpResult {
 	lastCmdId, ok := kv.clientCmdIdMap[op.ClientId]
+	opResult := OpResult{
+		ClientId: op.ClientId,
+		CmdId:    op.CmdId,
+	}
 	if !ok || lastCmdId < op.CmdId {
-		kv.apply(op)
+		kv.apply(op, &opResult)
 		kv.clientCmdIdMap[op.ClientId] = op.CmdId
 	} else if op.Type == GET {
-		kv.apply(op)
+		kv.apply(op, &opResult)
 	}
+	return opResult
 }
 
 func (kv *KVServer) applier() {
@@ -234,14 +243,14 @@ func (kv *KVServer) applier() {
 			index := applyMsg.CommandIndex
 			op := applyMsg.Command.(Op)
 			kv.mu.Lock()
-			kv.checkAndApply(&op)
+			opRes := kv.checkAndApply(&op)
 			opResChan, ok := kv.finishedOpChans[index]
 			if !ok {
-				opResChan = make(chan Op, 1)
+				opResChan = make(chan OpResult, 1)
 				kv.finishedOpChans[index] = opResChan
 			}
 			kv.mu.Unlock()
-			opResChan <- op
+			opResChan <- opRes
 		} else if applyMsg.SnapshotValid {
 			//TODO: 3B
 		}
@@ -249,18 +258,22 @@ func (kv *KVServer) applier() {
 	}
 }
 
-func (kv *KVServer) apply(op *Op) {
+func (kv *KVServer) apply(op *Op, opResult *OpResult) {
 	if op.Type == GET {
 		value, ok := kv.kvStorage[op.Key]
 		if !ok {
-			op.Value = ""
+			opResult.Value = ""
+			opResult.Err = ErrNoKey
 		} else {
-			op.Value = value
+			opResult.Value = value
+			opResult.Err = OK
 		}
 	} else if op.Type == PUT {
 		kv.kvStorage[op.Key] = op.Value
+		opResult.Err = OK
 	} else if op.Type == APPEND {
 		kv.kvStorage[op.Key] += op.Value
+		opResult.Err = OK
 	} else {
 		DPrintf("KV.APPLY: UNKNOWN OPERATION: %v", op.Type)
 	}
