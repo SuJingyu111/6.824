@@ -90,17 +90,6 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	select {
 	case opResult := <-resChan:
 		if op.CmdId == opResult.CmdId && op.ClientId == opResult.ClientId && kv.rf.IsLeader() {
-			/*
-				if opResult.Value == "" {
-					reply.Err = ErrNoKey
-					reply.Value = ""
-					DPrintf("SERVER_GET: ErrNoKey: GET op with CmdId %v and key %v from client %v", args.CmdId, args.Key, args.ClientId)
-				} else {
-					DPrintf("SERVER_GET: OK: GET op with CmdId %v and key %v from client %v, value: %v", args.CmdId, args.Key, args.ClientId, opResult.Value)
-					reply.Err = OK
-					reply.Value = opResult.Value
-				}
-			*/
 			reply.Err = opResult.Err
 			reply.Value = opResult.Value
 		} else {
