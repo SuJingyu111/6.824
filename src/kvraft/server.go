@@ -253,8 +253,9 @@ func (kv *KVServer) applier() {
 			opResChan <- opRes
 		} else if applyMsg.SnapshotValid {
 			//TODO: 3B
+		} else {
+			DPrintf("KV.APPLIER: Unknown type of applyMsg")
 		}
-
 	}
 }
 
