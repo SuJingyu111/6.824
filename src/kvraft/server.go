@@ -100,16 +100,16 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 		DPrintf("SERVER_GET: Timeout, ErrWrongLeader: GET op with CmdId %v and key %v from client %v", args.CmdId, args.Key, args.ClientId)
 		reply.Err = ErrWrongLeader
 	}
-	kv.mu.Lock()
-	kv.deleteChanAtIdx(index)
-	kv.mu.Unlock()
+	go kv.deleteChanAtIdx(index)
 }
 
 func (kv *KVServer) deleteChanAtIdx(index int) {
+	kv.mu.Lock()
 	_, ok := kv.finishedOpChans[index]
 	if ok {
 		delete(kv.finishedOpChans, index)
 	}
+	kv.mu.Unlock()
 }
 
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
@@ -145,9 +145,7 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 		DPrintf("SERVER_PUT_APPEND: ErrWrongLeader from TIMEOUT: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
 		reply.Err = ErrWrongLeader
 	}
-	kv.mu.Lock()
-	kv.deleteChanAtIdx(index)
-	kv.mu.Unlock()
+	go kv.deleteChanAtIdx(index)
 }
 
 //
