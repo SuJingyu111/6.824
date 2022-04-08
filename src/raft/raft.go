@@ -108,7 +108,7 @@ type Raft struct {
 	nextIndex  []int
 	matchIndex []int
 
-	//2D last log info. Persisted for recovery
+	//2D last log info.
 	lastLogIndexNotIncluded int
 	lastLogTermNotIncluded  int
 }
