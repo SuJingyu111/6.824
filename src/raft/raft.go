@@ -79,7 +79,7 @@ const (
 // A Go object implementing a single Raft peer.
 //
 type Raft struct {
-	mu        sync.Mutex          // Lock to protect shared access to this peer's state
+	mu        sync.RWMutex        // Lock to protect shared access to this peer's state
 	peers     []*labrpc.ClientEnd // RPC end points of all peers
 	persister *Persister          // Object to hold this peer's persisted state
 	me        int                 // this peer's index into peers[]
@@ -353,9 +353,15 @@ func (rf *Raft) killed() bool {
 }
 
 func (rf *Raft) IsLeader() bool {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
+	rf.mu.RLock()
+	defer rf.mu.RUnlock()
 	return rf.serverState == LEADER
+}
+
+func (rf *Raft) GetLogSize() int {
+	rf.mu.RLock()
+	defer rf.mu.RUnlock()
+	return len(rf.log)
 }
 
 // The ticker go routine starts a new election if this peer hasn't received
