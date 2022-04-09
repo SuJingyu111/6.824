@@ -315,6 +315,7 @@ func GenericTest(t *testing.T, part string, nclients int, nservers int, unreliab
 		if crash {
 			// log.Printf("shutdown servers\n")
 			for i := 0; i < nservers; i++ {
+				DPrintf("CRASH: Server %v crashed", i)
 				cfg.ShutdownServer(i)
 			}
 			// Wait for a while for servers to shutdown, since
@@ -323,9 +324,11 @@ func GenericTest(t *testing.T, part string, nclients int, nservers int, unreliab
 			// log.Printf("restart servers\n")
 			// crash and re-start all
 			for i := 0; i < nservers; i++ {
+				DPrintf("CRASH: Server %v reconnected", i)
 				cfg.StartServer(i)
 			}
 			cfg.ConnectAll()
+			DPrintf("CRASH: Connected All")
 		}
 
 		// log.Printf("wait for clients\n")

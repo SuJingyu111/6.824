@@ -16,7 +16,7 @@ func (rf *Raft) applier() {
 		if first < last {
 			copy(entries, rf.log[first:last])
 		}
-		rf.lastApplied = lastApplied + len(entries)
+		//rf.lastApplied = lastApplied + len(entries)
 		rf.mu.Unlock()
 		rf.appluMu.Lock()
 		for idx, entry := range entries {
@@ -25,6 +25,9 @@ func (rf *Raft) applier() {
 				Command:      entry.Command,
 				CommandIndex: lastApplied + idx + 1,
 			}
+			rf.mu.Lock()
+			rf.lastApplied = lastApplied + idx + 1
+			rf.mu.Unlock()
 			DPrintf("APPLIER: Server %v applied entry with real index %v and content %v", rf.me, lastApplied+idx+1, entry.Command)
 		}
 		rf.appluMu.Unlock()

@@ -66,19 +66,19 @@ func (ck *Clerk) Get(key string) string {
 
 	for {
 		reply := GetReply{}
-		DPrintf("CLIENT_GET: Client %v sent get operation with ID %v to server %v", thisClientId, thisCmdId, thisLeaderId)
+		//DPrintf("CLIENT_GET: Client %v sent get operation with ID %v to server %v", thisClientId, thisCmdId, thisLeaderId)
 		ok := ck.servers[thisLeaderId].Call("KVServer.Get", &args, &reply)
 		if ok {
 			if reply.Err == OK {
 				atomic.StoreInt64(&ck.lastACKedLeaderId, thisLeaderId)
-				DPrintf("CLIENT_GET: OK: Client %v get operation with ID %v to server %v, value: %v", thisClientId, thisCmdId, thisLeaderId, reply.Value)
+				//DPrintf("CLIENT_GET: OK: Client %v get operation with ID %v to server %v, value: %v", thisClientId, thisCmdId, thisLeaderId, reply.Value)
 				return reply.Value
 			} else if reply.Err == ErrNoKey {
 				atomic.StoreInt64(&ck.lastACKedLeaderId, thisLeaderId)
-				DPrintf("CLIENT_GET: ErrNoKey: Client %v get operation with ID %v to server %v", thisClientId, thisCmdId, thisLeaderId)
+				//DPrintf("CLIENT_GET: ErrNoKey: Client %v get operation with ID %v to server %v", thisClientId, thisCmdId, thisLeaderId)
 				return ""
 			} else {
-				DPrintf("CLIENT_GET: ErrWrongLeader: Client %v get operation with ID %v to server %v", thisClientId, thisCmdId, thisLeaderId)
+				//DPrintf("CLIENT_GET: ErrWrongLeader: Client %v get operation with ID %v to server %v", thisClientId, thisCmdId, thisLeaderId)
 				thisLeaderId = (thisLeaderId + 1) % int64(len(ck.servers))
 			}
 		}
@@ -116,17 +116,17 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 
 	for {
 		reply := PutAppendReply{}
-		DPrintf("CLIENT_PUT_APPEND: client %v %v operation, cmdId: %v, leaderId: %v, key: %v, "+
-			"value: %v", thisClientId, op, thisCmdId, thisLeaderId, key, value)
+		//DPrintf("CLIENT_PUT_APPEND: client %v %v operation, cmdId: %v, leaderId: %v, key: %v, "+
+		//	"value: %v", thisClientId, op, thisCmdId, thisLeaderId, key, value)
 		ok := ck.servers[thisLeaderId].Call("KVServer.PutAppend", &args, &reply)
 		if ok && !(reply.Err == ErrWrongLeader) {
 			atomic.StoreInt64(&ck.lastACKedLeaderId, thisLeaderId)
-			DPrintf("CLIENT_PUT_APPEND: OK: client %v %v operation, cmdId: %v, leaderId: %v, key: %v, "+
-				"value: %v", thisClientId, op, thisCmdId, thisLeaderId, key, value)
+			//DPrintf("CLIENT_PUT_APPEND: OK: client %v %v operation, cmdId: %v, leaderId: %v, key: %v, "+
+			//	"value: %v", thisClientId, op, thisCmdId, thisLeaderId, key, value)
 			break
 		} else {
-			DPrintf("CLIENT_PUT_APPEND: ErrWrongLeader: client %v %v operation, cmdId: %v, leaderId: %v, key: %v, "+
-				"value: %v", thisClientId, op, thisCmdId, thisLeaderId, key, value)
+			//DPrintf("CLIENT_PUT_APPEND: ErrWrongLeader: client %v %v operation, cmdId: %v, leaderId: %v, key: %v, "+
+			//	"value: %v", thisClientId, op, thisCmdId, thisLeaderId, key, value)
 			thisLeaderId = (thisLeaderId + 1) % int64(len(ck.servers))
 		}
 	}

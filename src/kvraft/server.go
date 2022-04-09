@@ -93,6 +93,12 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	select {
 	case opResult := <-resChan:
 		if kv.isSameOp(&op, &opResult) && kv.rf.IsLeader() {
+			kv.mu.Lock()
+			if kv.maxraftstate > 0 && kv.maxraftstate < kv.rf.GetPersisterLogSize() {
+				DPrintf("KVSERVER_SNAP: kv.maxraftstate: %v, kv.lastApplied : %v, rf.logsize: %v", kv.maxraftstate, kv.lastApplied, kv.rf.GetPersisterLogSize())
+				kv.rf.Snapshot(index, kv.takeSnapshot())
+			}
+			kv.mu.Unlock()
 			reply.Err = opResult.Err
 			reply.Value = opResult.Value
 		} else {
@@ -139,6 +145,16 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	case opResult := <-resChan:
 		if kv.isSameOp(&op, &opResult) && kv.rf.IsLeader() {
 			DPrintf("SERVER_PUT_APPEND: OK: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
+			//TODO FREE THIS
+			//kv.mu.Lock()
+			//DPrintf("SERVER_PUT_APPEND: new value: %v", kv.kvStorage[args.Key])
+			//kv.mu.Unlock()
+			kv.mu.Lock()
+			if kv.maxraftstate > 0 && kv.maxraftstate < kv.rf.GetPersisterLogSize() {
+				DPrintf("KVSERVER_SNAP: kv.maxraftstate: %v, kv.lastApplied : %v, rf.logsize: %v", kv.maxraftstate, kv.lastApplied, kv.rf.GetPersisterLogSize())
+				kv.rf.Snapshot(index, kv.takeSnapshot())
+			}
+			kv.mu.Unlock()
 			reply.Err = OK
 		} else {
 			DPrintf("SERVER_PUT_APPEND: ErrWrongLeader: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
@@ -212,6 +228,7 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.lastApplied = -1
 
 	kv.readSnapshot(kv.rf.GetSnapshot())
+	DPrintf("Initial kvStorage: %v", kv.kvStorage)
 
 	go kv.applier()
 
@@ -255,9 +272,9 @@ func (kv *KVServer) applier() {
 				opResChan = make(chan OpResult, 1)
 				kv.finishedOpChans[index] = opResChan
 			}
-			DPrintf("KVSERVER_SNAP: kv.maxraftstate: %v, kv.lastApplied : %v, rf.logsize: %v", kv.maxraftstate, kv.lastApplied, kv.rf.GetPersisterLogSize())
 			if kv.maxraftstate > 0 && kv.maxraftstate < kv.rf.GetPersisterLogSize() {
-				kv.rf.Snapshot(int(kv.lastApplied), kv.takeSnapshot())
+				DPrintf("KVSERVER_SNAP: kv.maxraftstate: %v, kv.lastApplied : %v, rf.logsize: %v", kv.maxraftstate, kv.lastApplied, kv.rf.GetPersisterLogSize())
+				kv.rf.Snapshot(index-1, kv.takeSnapshot())
 			}
 			kv.mu.Unlock()
 			opResChan <- opRes
@@ -290,6 +307,7 @@ func (kv *KVServer) readSnapshot(snapshot []byte) {
 	if d.Decode(&newkvStorage) != nil || d.Decode(&newclientCmdIdMap) != nil {
 		DPrintf("READ_SNAP_SHOT: read persist went wrong!")
 	} else {
+		DPrintf("READ_SNAP_SHOT: read persist successful!")
 		kv.kvStorage = newkvStorage
 		kv.clientCmdIdMap = newclientCmdIdMap
 	}
