@@ -279,10 +279,12 @@ func (kv *KVServer) applier() {
 			kv.mu.Unlock()
 			opResChan <- opRes
 		} else if applyMsg.SnapshotValid {
+			kv.mu.Lock()
 			if kv.rf.CondInstallSnapshot(applyMsg.SnapshotTerm, applyMsg.SnapshotIndex, applyMsg.Snapshot) {
 				kv.readSnapshot(applyMsg.Snapshot)
 				kv.lastApplied = int64(applyMsg.SnapshotIndex)
 			}
+			kv.mu.Unlock()
 		} else {
 			DPrintf("KV.APPLIER: Unknown type of applyMsg")
 		}
