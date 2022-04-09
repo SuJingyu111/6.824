@@ -359,14 +359,10 @@ func (rf *Raft) IsLeader() bool {
 }
 
 func (rf *Raft) GetPersisterLogSize() int {
-	rf.mu.RLock()
-	defer rf.mu.RUnlock()
 	return rf.persister.RaftStateSize()
 }
 
 func (rf *Raft) GetSnapshot() []byte {
-	rf.mu.RLock()
-	defer rf.mu.RUnlock()
 	return rf.persister.ReadSnapshot()
 }
 
@@ -379,7 +375,7 @@ func (rf *Raft) ticker() {
 		// be started and to randomize sleeping time using
 		// time.Sleep().
 		rf.tick()
-		sleepTime := rand.Intn(10) + 10
+		sleepTime := rand.Intn(12) + 10
 		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 	}
 }
