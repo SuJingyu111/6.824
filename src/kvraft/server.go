@@ -4,6 +4,7 @@ import (
 	"6.824/labgob"
 	"6.824/labrpc"
 	"6.824/raft"
+	"bytes"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -59,6 +60,8 @@ type KVServer struct {
 	kvStorage       map[string]string
 	clientCmdIdMap  map[int64]int64
 	finishedOpChans map[int]chan OpResult
+
+	lastApplied int64
 }
 
 func (kv *KVServer) registerChanAtIdx(index int) chan OpResult {
@@ -89,7 +92,7 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	kv.mu.Unlock()
 	select {
 	case opResult := <-resChan:
-		if op.CmdId == opResult.CmdId && op.ClientId == opResult.ClientId && kv.rf.IsLeader() {
+		if kv.isSameOp(&op, &opResult) && kv.rf.IsLeader() {
 			reply.Err = opResult.Err
 			reply.Value = opResult.Value
 		} else {
@@ -133,8 +136,8 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	resChan := kv.registerChanAtIdx(index)
 	kv.mu.Unlock()
 	select {
-	case finishedOp := <-resChan:
-		if op.CmdId == finishedOp.CmdId && op.ClientId == finishedOp.ClientId && kv.rf.IsLeader() {
+	case opResult := <-resChan:
+		if kv.isSameOp(&op, &opResult) && kv.rf.IsLeader() {
 			DPrintf("SERVER_PUT_APPEND: OK: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
 			reply.Err = OK
 		} else {
@@ -146,6 +149,10 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 		reply.Err = ErrWrongLeader
 	}
 	go kv.deleteChanAtIdx(index)
+}
+
+func (kv *KVServer) isSameOp(op *Op, opResult *OpResult) bool {
+	return op.CmdId == opResult.CmdId && op.ClientId == opResult.ClientId
 }
 
 //
@@ -202,24 +209,33 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.clientCmdIdMap = make(map[int64]int64)
 	kv.finishedOpChans = make(map[int]chan OpResult)
 
+	kv.lastApplied = -1
+
+	kv.readSnapshot(kv.rf.GetSnapshot())
+
 	go kv.applier()
 
 	return kv
 }
 
 func (kv *KVServer) checkAndApply(op *Op) OpResult {
-	lastCmdId, ok := kv.clientCmdIdMap[op.ClientId]
+	//lastCmdId, ok := kv.clientCmdIdMap[op.ClientId]
 	opResult := OpResult{
 		ClientId: op.ClientId,
 		CmdId:    op.CmdId,
 	}
-	if !ok || lastCmdId < op.CmdId {
+	if kv.checkOpUpToDate(op) {
 		kv.apply(op, &opResult)
 		kv.clientCmdIdMap[op.ClientId] = op.CmdId
 	} else if op.Type == GET {
 		kv.apply(op, &opResult)
 	}
 	return opResult
+}
+
+func (kv *KVServer) checkOpUpToDate(op *Op) bool {
+	lastCmdId, ok := kv.clientCmdIdMap[op.ClientId]
+	return !ok || lastCmdId < op.CmdId
 }
 
 func (kv *KVServer) applier() {
@@ -231,19 +247,60 @@ func (kv *KVServer) applier() {
 			op := applyMsg.Command.(Op)
 			kv.mu.Lock()
 			opRes := kv.checkAndApply(&op)
+			if opRes.Err == OK || opRes.Err == ErrNoKey {
+				kv.lastApplied = int64(index)
+			}
 			opResChan, ok := kv.finishedOpChans[index]
 			if !ok {
 				opResChan = make(chan OpResult, 1)
 				kv.finishedOpChans[index] = opResChan
 			}
+			DPrintf("KVSERVER_SNAP: kv.maxraftstate: %v, kv.lastApplied : %v, rf.logsize: %v", kv.maxraftstate, kv.lastApplied, kv.rf.GetPersisterLogSize())
+			if kv.maxraftstate > 0 && kv.maxraftstate < kv.rf.GetPersisterLogSize() {
+				kv.rf.Snapshot(int(kv.lastApplied), kv.takeSnapshot())
+			}
 			kv.mu.Unlock()
 			opResChan <- opRes
 		} else if applyMsg.SnapshotValid {
-			//TODO: 3B
+			if kv.rf.CondInstallSnapshot(applyMsg.SnapshotTerm, applyMsg.SnapshotIndex, applyMsg.Snapshot) {
+				kv.readSnapshot(applyMsg.Snapshot)
+				kv.lastApplied = int64(applyMsg.SnapshotIndex)
+			}
 		} else {
 			DPrintf("KV.APPLIER: Unknown type of applyMsg")
 		}
+		//snapshot check here
+		/*
+				kv.mu.Lock()
+				DPrintf("KVSERVER_SNAP: kv.maxraftstate: %v, kv.lastApplied : %v, rf.logsize: %v", kv.maxraftstate, kv.lastApplied, kv.rf.GetPersisterLogSize())
+				if kv.maxraftstate > 0 && kv.maxraftstate/3 < kv.rf.GetPersisterLogSize() {
+					kv.rf.Snapshot(int(kv.lastApplied), kv.takeSnapshot())
+				}
+
+			kv.mu.Unlock()
+		*/
 	}
+}
+
+func (kv *KVServer) readSnapshot(snapshot []byte) {
+	r := bytes.NewBuffer(snapshot)
+	d := labgob.NewDecoder(r)
+	var newkvStorage map[string]string
+	var newclientCmdIdMap map[int64]int64
+	if d.Decode(&newkvStorage) != nil || d.Decode(&newclientCmdIdMap) != nil {
+		DPrintf("READ_SNAP_SHOT: read persist went wrong!")
+	} else {
+		kv.kvStorage = newkvStorage
+		kv.clientCmdIdMap = newclientCmdIdMap
+	}
+}
+
+func (kv *KVServer) takeSnapshot() []byte {
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	e.Encode(kv.kvStorage)
+	e.Encode(kv.clientCmdIdMap)
+	return w.Bytes()
 }
 
 func (kv *KVServer) apply(op *Op, opResult *OpResult) {

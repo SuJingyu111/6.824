@@ -83,7 +83,7 @@ func (rf *Raft) trimLog(index int) {
 	DPrintf("TRIM: new log: %v, supposed content: %v", newLog, rf.log[rf.getLogIdxOfLogicalIdx(index+1):])
 	rf.log = newLog
 	rf.lastLogIndexNotIncluded = index
-	rf.persist()
+	//rf.persist()
 	DPrintf("TRIM: Log content of server %v after trim up to index %v: %v", rf.me, index, rf.log)
 }
 

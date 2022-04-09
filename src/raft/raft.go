@@ -358,10 +358,16 @@ func (rf *Raft) IsLeader() bool {
 	return rf.serverState == LEADER
 }
 
-func (rf *Raft) GetLogSize() int {
+func (rf *Raft) GetPersisterLogSize() int {
 	rf.mu.RLock()
 	defer rf.mu.RUnlock()
-	return len(rf.log)
+	return rf.persister.RaftStateSize()
+}
+
+func (rf *Raft) GetSnapshot() []byte {
+	rf.mu.RLock()
+	defer rf.mu.RUnlock()
+	return rf.persister.ReadSnapshot()
 }
 
 // The ticker go routine starts a new election if this peer hasn't received
