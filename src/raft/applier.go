@@ -1,6 +1,18 @@
 package raft
 
-import "math"
+import (
+	"log"
+	"math"
+)
+
+const ApplierDebug = false
+
+func ApplierDPrintf(format string, a ...interface{}) (n int, err error) {
+	if ApplierDebug {
+		log.Printf(format, a...)
+	}
+	return
+}
 
 func (rf *Raft) applier() {
 	for rf.killed() == false {
@@ -16,21 +28,24 @@ func (rf *Raft) applier() {
 		if first < last {
 			copy(entries, rf.log[first:last])
 		}
-		//rf.lastApplied = lastApplied + len(entries)
+		rf.lastApplied = lastApplied + len(entries)
 		rf.mu.Unlock()
-		rf.appluMu.Lock()
+		//rf.appluMu.Lock()
 		for idx, entry := range entries {
+			if entry.Command == nil {
+				ApplierDPrintf("RAFT_APPLIER: Command is nil")
+			}
 			rf.applyCh <- ApplyMsg{
 				CommandValid: true,
 				Command:      entry.Command,
 				CommandIndex: lastApplied + idx + 1,
 			}
-			rf.mu.Lock()
-			rf.lastApplied = lastApplied + idx + 1
-			rf.mu.Unlock()
-			DPrintf("APPLIER: Server %v applied entry with real index %v and content %v", rf.me, lastApplied+idx+1, entry.Command)
+			//rf.mu.Lock()
+			//rf.lastApplied = lastApplied + idx + 1
+			//rf.mu.Unlock()
+			//DPrintf("APPLIER: Server %v applied entry with real index %v and content %v", rf.me, lastApplied+idx+1, entry.Command)
 		}
-		rf.appluMu.Unlock()
+		//rf.appluMu.Unlock()
 		/*
 			rf.mu.Lock()
 

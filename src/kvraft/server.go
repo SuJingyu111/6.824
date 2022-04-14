@@ -261,9 +261,20 @@ func (kv *KVServer) applier() {
 		applyMsg := <-kv.applyCh
 		if applyMsg.CommandValid {
 			index := applyMsg.CommandIndex
-			op := applyMsg.Command.(Op)
 			kv.mu.Lock()
-			opRes := kv.checkAndApply(&op)
+			op := Op{}
+			opRes := OpResult{
+				ClientId: 0,
+				CmdId:    0,
+				Err:      "",
+				Value:    "",
+			}
+			if applyMsg.Command != nil {
+				op = applyMsg.Command.(Op)
+				opRes = kv.checkAndApply(&op)
+			} else {
+				continue
+			}
 			if opRes.Err == OK || opRes.Err == ErrNoKey {
 				kv.lastApplied = int64(index)
 			}
