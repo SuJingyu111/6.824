@@ -4,7 +4,10 @@ package shardctrler
 // Shardctrler clerk.
 //
 
-import "6.824/labrpc"
+import (
+	"6.824/labrpc"
+	"sync"
+)
 import "time"
 import "crypto/rand"
 import "math/big"
@@ -12,6 +15,11 @@ import "math/big"
 type Clerk struct {
 	servers []*labrpc.ClientEnd
 	// Your data here.
+	clientId          int64
+	lastACKedLeaderId int64
+	cmdId             int64
+
+	mu sync.Mutex
 }
 
 func nrand() int64 {
@@ -25,6 +33,9 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
 	// Your code here.
+	ck.clientId = nrand()
+	ck.cmdId = 0
+	ck.lastACKedLeaderId = 0
 	return ck
 }
 
