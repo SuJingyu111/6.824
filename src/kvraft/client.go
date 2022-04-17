@@ -130,7 +130,6 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 			thisLeaderId = (thisLeaderId + 1) % int64(len(ck.servers))
 		}
 	}
-
 }
 
 func (ck *Clerk) Put(key string, value string) {
