@@ -1,11 +1,29 @@
 package shardctrler
 
-
-import "6.824/raft"
+import (
+	"6.824/raft"
+	"log"
+)
 import "6.824/labrpc"
 import "sync"
 import "6.824/labgob"
 
+const Debug = false
+
+func DPrintf(format string, a ...interface{}) (n int, err error) {
+	if Debug {
+		log.Printf(format, a...)
+	}
+	return
+}
+
+//Operation types
+const (
+	JOIN  string = "Join"
+	LEAVE string = "Leave"
+	MOVE  string = "Move"
+	Query string = "Query"
+)
 
 type ShardCtrler struct {
 	mu      sync.Mutex
@@ -14,15 +32,14 @@ type ShardCtrler struct {
 	applyCh chan raft.ApplyMsg
 
 	// Your data here.
-
-	configs []Config // indexed by config num
+	clientCmdIdMap  map[int64]int64
+	configs         []Config // indexed by config num
+	finishedOpChans map[int]chan Op
 }
-
 
 type Op struct {
 	// Your data here.
 }
-
 
 func (sc *ShardCtrler) Join(args *JoinArgs, reply *JoinReply) {
 	// Your code here.
@@ -39,7 +56,6 @@ func (sc *ShardCtrler) Move(args *MoveArgs, reply *MoveReply) {
 func (sc *ShardCtrler) Query(args *QueryArgs, reply *QueryReply) {
 	// Your code here.
 }
-
 
 //
 // the tester calls Kill() when a ShardCtrler instance won't
