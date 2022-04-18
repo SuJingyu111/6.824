@@ -145,10 +145,6 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	case opResult := <-resChan:
 		if kv.isSameOp(&op, &opResult) && kv.rf.IsLeader() {
 			DPrintf("SERVER_PUT_APPEND: OK: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
-			//TODO FREE THIS
-			//kv.mu.Lock()
-			//DPrintf("SERVER_PUT_APPEND: new value: %v", kv.kvStorage[args.Key])
-			//kv.mu.Unlock()
 			kv.mu.Lock()
 			if kv.maxraftstate > 0 && kv.maxraftstate < kv.rf.GetPersisterLogSize() {
 				DPrintf("KVSERVER_SNAP: kv.maxraftstate: %v, kv.lastApplied : %v, rf.logsize: %v", kv.maxraftstate, kv.lastApplied, kv.rf.GetPersisterLogSize())
@@ -299,16 +295,6 @@ func (kv *KVServer) applier() {
 		} else {
 			DPrintf("KV.APPLIER: Unknown type of applyMsg")
 		}
-		//snapshot check here
-		/*
-				kv.mu.Lock()
-				DPrintf("KVSERVER_SNAP: kv.maxraftstate: %v, kv.lastApplied : %v, rf.logsize: %v", kv.maxraftstate, kv.lastApplied, kv.rf.GetPersisterLogSize())
-				if kv.maxraftstate > 0 && kv.maxraftstate/3 < kv.rf.GetPersisterLogSize() {
-					kv.rf.Snapshot(int(kv.lastApplied), kv.takeSnapshot())
-				}
-
-			kv.mu.Unlock()
-		*/
 	}
 }
 
