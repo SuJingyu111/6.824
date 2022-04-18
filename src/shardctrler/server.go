@@ -10,7 +10,7 @@ import "6.824/labrpc"
 import "sync"
 import "6.824/labgob"
 
-const Debug = false
+const Debug = true
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug {
@@ -285,7 +285,8 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister)
 
 func (sc *ShardCtrler) applier() {
 
-	for !sc.killed() {
+	for {
+		//DPrintf("APPLIER")
 		applyMsg := <-sc.applyCh
 		if applyMsg.CommandValid {
 			index := applyMsg.CommandIndex
@@ -342,17 +343,17 @@ func (sc *ShardCtrler) checkOpUpToDate(op *Op) bool {
 
 func (sc *ShardCtrler) apply(op *Op, opResult *OpResult) {
 	if op.Type == QUERY {
-		sc.mu.Lock()
+		//sc.mu.Lock()
 		if op.Num == -1 || op.Num >= len(sc.configs) {
 			opResult.Config = sc.configs[len(sc.configs)-1]
 		} else {
 			opResult.Config = sc.configs[op.Num]
 		}
-		sc.mu.Unlock()
+		//sc.mu.Unlock()
 		opResult.Err = OK
 	} else if op.Type == JOIN {
 		newConfig := Config{}
-		sc.mu.Lock()
+		//sc.mu.Lock()
 		lastConfig := sc.getLastConfig()
 		newConfig.Num = len(sc.configs)
 		newGroup := make(map[int][]string)
@@ -363,7 +364,7 @@ func (sc *ShardCtrler) apply(op *Op, opResult *OpResult) {
 		for gid, servers := range op.Servers {
 			newServers := make([]string, len(servers))
 			copy(newServers, servers)
-			newConfig.Groups[gid] = newServers
+			newGroup[gid] = newServers
 		}
 		newConfig.Groups = newGroup
 
@@ -383,11 +384,11 @@ func (sc *ShardCtrler) apply(op *Op, opResult *OpResult) {
 		}
 		newConfig.Shards = newShards
 		sc.configs = append(sc.configs, newConfig)
-		sc.mu.Unlock()
+		//sc.mu.Unlock()
 		opResult.Err = OK
 	} else if op.Type == LEAVE {
 		newConfig := Config{}
-		sc.mu.Lock()
+		//sc.mu.Lock()
 		lastConfig := sc.getLastConfig()
 		//new config Num
 		newConfig.Num = len(sc.configs)
@@ -425,11 +426,11 @@ func (sc *ShardCtrler) apply(op *Op, opResult *OpResult) {
 		}
 		newConfig.Shards = newShards
 		sc.configs = append(sc.configs, newConfig)
-		sc.mu.Unlock()
+		//sc.mu.Unlock()
 		opResult.Err = OK
 	} else if op.Type == MOVE {
 		newConfig := Config{}
-		sc.mu.Lock()
+		//sc.mu.Lock()
 		//num
 		newConfig.Num = len(sc.configs)
 		//shard update
@@ -444,7 +445,7 @@ func (sc *ShardCtrler) apply(op *Op, opResult *OpResult) {
 		}
 		newConfig.Groups = newGroup
 		sc.configs = append(sc.configs, newConfig)
-		sc.mu.Unlock()
+		//sc.mu.Unlock()
 		opResult.Err = OK
 	} else {
 		DPrintf("SC.APPLY: UNKNOWN OPERATION: %v", op.Type)
