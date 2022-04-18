@@ -29,7 +29,8 @@ type Config struct {
 }
 
 const (
-	OK = "OK"
+	OK          = "OK"
+	WrongLeader = "WrongLeader"
 )
 
 type Err string
