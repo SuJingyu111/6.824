@@ -3,6 +3,7 @@ package shardctrler
 import (
 	"6.824/raft"
 	"log"
+	"sort"
 	"sync/atomic"
 	"time"
 )
@@ -10,7 +11,7 @@ import "6.824/labrpc"
 import "sync"
 import "6.824/labgob"
 
-const Debug = true
+const Debug = false
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug {
@@ -112,14 +113,14 @@ func (sc *ShardCtrler) Join(args *JoinArgs, reply *JoinReply) {
 	select {
 	case opResult := <-resChan:
 		if sc.isSameOp(&op, &opResult) && sc.rf.IsLeader() {
-			//DPrintf("SERVER_PUT_APPEND: OK: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
+			DPrintf("SERVER_JOIN: OK: CmdId %v from client %v", args.CmdId, args.ClientId)
 			reply.Err = OK
 		} else {
-			//DPrintf("SERVER_PUT_APPEND: ErrWrongLeader: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
+			DPrintf("SERVER_ERR_WRONGLEADER: OK: CmdId %v from client %v", args.CmdId, args.ClientId)
 			reply.WrongLeader = true
 		}
 	case <-time.After(200 * time.Millisecond):
-		//DPrintf("SERVER_PUT_APPEND: ErrWrongLeader from TIMEOUT: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
+		DPrintf("SERVER_ERR_TIMEOUT: OK: CmdId %v from client %v", args.CmdId, args.ClientId)
 		reply.WrongLeader = true
 	}
 	go sc.deleteChanAtIdx(index)
@@ -163,7 +164,7 @@ func (sc *ShardCtrler) Leave(args *LeaveArgs, reply *LeaveReply) {
 func (sc *ShardCtrler) Move(args *MoveArgs, reply *MoveReply) {
 	// Your code here.
 	op := Op{
-		Type:     LEAVE,
+		Type:     MOVE,
 		Shard:    args.Shard,
 		GID:      args.GID,
 		ClientId: args.ClientId,
@@ -199,7 +200,7 @@ func (sc *ShardCtrler) Move(args *MoveArgs, reply *MoveReply) {
 func (sc *ShardCtrler) Query(args *QueryArgs, reply *QueryReply) {
 	// Your code here.
 	op := Op{
-		Type:     LEAVE,
+		Type:     QUERY,
 		Num:      args.Num,
 		ClientId: args.ClientId,
 		CmdId:    args.CmdId,
@@ -343,17 +344,20 @@ func (sc *ShardCtrler) checkOpUpToDate(op *Op) bool {
 
 func (sc *ShardCtrler) apply(op *Op, opResult *OpResult) {
 	if op.Type == QUERY {
-		//sc.mu.Lock()
+		DPrintf("Query: Num: %v", op.Num)
+		DPrintf("Query: Config num: %v", len(sc.configs))
 		if op.Num == -1 || op.Num >= len(sc.configs) {
 			opResult.Config = sc.configs[len(sc.configs)-1]
+			DPrintf("Query: # of groups: %v", len(opResult.Config.Groups))
 		} else {
 			opResult.Config = sc.configs[op.Num]
+			DPrintf("Query: # of groups: %v", len(opResult.Config.Groups))
 		}
 		//sc.mu.Unlock()
 		opResult.Err = OK
 	} else if op.Type == JOIN {
 		newConfig := Config{}
-		//sc.mu.Lock()
+		DPrintf("JOIN: Servers: %v", op.Servers)
 		lastConfig := sc.getLastConfig()
 		newConfig.Num = len(sc.configs)
 		newGroup := make(map[int][]string)
@@ -369,13 +373,16 @@ func (sc *ShardCtrler) apply(op *Op, opResult *OpResult) {
 		newConfig.Groups = newGroup
 
 		newConfig.Shards = lastConfig.Shards
-		groupShardMap := sc.getGroupShardMap(newConfig.Shards)
+		groupShardMap := sc.getGroupShardMap(newConfig.Shards, newGroup)
+		DPrintf("JOIN: groupShardMap: %v", groupShardMap)
 		minGid, maxGid := sc.getMinGid(groupShardMap), sc.getMaxGid(groupShardMap)
-		for len(groupShardMap[maxGid])-len(groupShardMap[minGid]) > 1 {
-			groupShardMap[minGid] = append(groupShardMap[minGid], groupShardMap[minGid][0])
+		for maxGid == 0 || len(groupShardMap[maxGid])-len(groupShardMap[minGid]) > 1 {
+			groupShardMap[minGid] = append(groupShardMap[minGid], groupShardMap[maxGid][0])
 			groupShardMap[maxGid] = groupShardMap[maxGid][1:]
 			minGid, maxGid = sc.getMinGid(groupShardMap), sc.getMaxGid(groupShardMap)
 		}
+
+		DPrintf("JOIN: new groupShardMap: %v", groupShardMap)
 		var newShards [NShards]int
 		for gid, shards := range groupShardMap {
 			for _, shard := range shards {
@@ -384,6 +391,7 @@ func (sc *ShardCtrler) apply(op *Op, opResult *OpResult) {
 		}
 		newConfig.Shards = newShards
 		sc.configs = append(sc.configs, newConfig)
+		DPrintf("JOIN_END: # of configs: %v,  # of groups: %v, shard: %v", len(sc.configs), len(newConfig.Groups), newConfig.Shards)
 		//sc.mu.Unlock()
 		opResult.Err = OK
 	} else if op.Type == LEAVE {
@@ -401,7 +409,7 @@ func (sc *ShardCtrler) apply(op *Op, opResult *OpResult) {
 		newConfig.Groups = newGroup
 
 		newConfig.Shards = lastConfig.Shards
-		groupShardMap := sc.getGroupShardMap(newConfig.Shards)
+		groupShardMap := sc.getGroupShardMap(newConfig.Shards, newGroup)
 		freeShards := make([]int, 0)
 		var newShards [NShards]int
 		for _, gid := range op.GIDs {
@@ -457,36 +465,54 @@ func (sc *ShardCtrler) getLastConfig() Config {
 	return sc.configs[len(sc.configs)-1]
 }
 
-func (sc *ShardCtrler) getGroupShardMap(shards [NShards]int) map[int][]int {
+func (sc *ShardCtrler) getGroupShardMap(shards [NShards]int, newGroup map[int][]string) map[int][]int {
 	groupShardMap := make(map[int][]int)
+	for key, _ := range newGroup {
+		groupShardMap[key] = make([]int, 0)
+	}
 	for shard, gid := range shards {
-		if _, ok := groupShardMap[gid]; !ok {
-			groupShardMap[gid] = make([]int, 0)
-		}
+		//if _, ok := groupShardMap[gid]; !ok {
+		//groupShardMap[gid] = make([]int, 0)
+		//}
 		groupShardMap[gid] = append(groupShardMap[gid], shard)
 	}
 	return groupShardMap
 }
 
 func (sc *ShardCtrler) getMinGid(groupShardMap map[int][]int) int {
+	var gids []int
+	for gid := range groupShardMap {
+		gids = append(gids, gid)
+	}
+	sort.Ints(gids)
 	minGid := -1
 	minLen := NShards + 1
-	for gid, shards := range groupShardMap {
-		if len(shards) < minLen {
+	for _, gid := range gids {
+		if gid != 0 && len(groupShardMap[gid]) < minLen {
 			minGid = gid
-			minLen = len(shards)
+			minLen = len(groupShardMap[gid])
 		}
 	}
 	return minGid
 }
 
 func (sc *ShardCtrler) getMaxGid(groupShardMap map[int][]int) int {
+	if shards, ok := groupShardMap[0]; ok {
+		if len(shards) > 0 {
+			return 0
+		}
+	}
+	var gids []int
+	for gid := range groupShardMap {
+		gids = append(gids, gid)
+	}
+	sort.Ints(gids)
 	maxGid := -1
 	maxLen := -1
-	for gid, shards := range groupShardMap {
-		if len(shards) > maxLen {
+	for _, gid := range gids {
+		if len(groupShardMap[gid]) > maxLen {
 			maxGid = gid
-			maxLen = len(shards)
+			maxLen = len(groupShardMap[gid])
 		}
 	}
 	return maxGid
