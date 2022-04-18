@@ -35,10 +35,26 @@ type ShardCtrler struct {
 	clientCmdIdMap  map[int64]int64
 	configs         []Config // indexed by config num
 	finishedOpChans map[int]chan Op
+
+	lastApplied int64
 }
 
 type Op struct {
 	// Your data here.
+	Type string
+
+	Servers map[int][]string //JOIN
+
+	GIDs []int //LEAVE
+
+	Shard int //MOVE
+	GID   int //MOVE
+
+	Num int //QUERY
+
+	//Dup elimination
+	ClientId int64
+	CmdId    int64
 }
 
 func (sc *ShardCtrler) Join(args *JoinArgs, reply *JoinReply) {
@@ -55,6 +71,7 @@ func (sc *ShardCtrler) Move(args *MoveArgs, reply *MoveReply) {
 
 func (sc *ShardCtrler) Query(args *QueryArgs, reply *QueryReply) {
 	// Your code here.
+
 }
 
 //
