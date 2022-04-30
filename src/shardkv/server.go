@@ -17,6 +17,13 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 	return
 }
 
+//Operation types
+const (
+	GET    string = "Get"
+	PUT    string = "Put"
+	APPEND string = "Append"
+)
+
 type Op struct {
 	// Your definitions here.
 	// Field names must start with capital letters,
