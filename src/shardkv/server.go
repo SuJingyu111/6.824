@@ -57,6 +57,9 @@ type ShardKV struct {
 	// Your definitions here.
 	lastApplied int //last applied index, for log compaction
 
+	kvStorage       map[string]string
+	clientCmdIdMap  map[int64]int64
+	finishedOpChans map[int]chan OpResult
 }
 
 func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) {
