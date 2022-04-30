@@ -37,6 +37,13 @@ type Op struct {
 	CmdId    int64
 }
 
+type OpResult struct {
+	ClientId int64
+	CmdId    int64
+	Err      Err
+	Value    string
+}
+
 type ShardKV struct {
 	mu           sync.Mutex
 	me           int
