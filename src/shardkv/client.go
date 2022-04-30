@@ -40,6 +40,9 @@ type Clerk struct {
 	config   shardctrler.Config
 	make_end func(string) *labrpc.ClientEnd
 	// You will have to modify this struct.
+	clientId         int64
+	cmdId            int64
+	serverIdx2GidMap map[int]int
 }
 
 //
@@ -104,7 +107,6 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	args.Key = key
 	args.Value = value
 	args.Op = op
-
 
 	for {
 		shard := key2shard(key)
