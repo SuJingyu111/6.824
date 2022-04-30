@@ -28,6 +28,13 @@ type Op struct {
 	// Your definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
+	Type  string
+	Key   string
+	Value string
+
+	//Dup elimination
+	ClientId int64
+	CmdId    int64
 }
 
 type ShardKV struct {
