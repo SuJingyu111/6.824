@@ -42,6 +42,7 @@ type GetArgs struct {
 	ClientId int64
 	CmdId    int64
 	Gid      int
+	Op       string
 }
 
 type GetReply struct {
