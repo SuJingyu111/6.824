@@ -1,9 +1,21 @@
 package shardkv
 
-import "6.824/labrpc"
+import (
+	"6.824/labrpc"
+	"log"
+)
 import "6.824/raft"
 import "sync"
 import "6.824/labgob"
+
+const Debug = false
+
+func DPrintf(format string, a ...interface{}) (n int, err error) {
+	if Debug {
+		log.Printf(format, a...)
+	}
+	return
+}
 
 type Op struct {
 	// Your definitions here.
