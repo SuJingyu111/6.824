@@ -8,7 +8,10 @@ package shardkv
 // talks to the group that holds the key's shard.
 //
 
-import "6.824/labrpc"
+import (
+	"6.824/labrpc"
+	"sync"
+)
 import "crypto/rand"
 import "math/big"
 import "6.824/shardctrler"
@@ -42,6 +45,7 @@ type Clerk struct {
 	// You will have to modify this struct.
 	clientId int64
 	cmdId    int64
+	mu       sync.RWMutex
 }
 
 //
@@ -73,10 +77,18 @@ func MakeClerk(ctrlers []*labrpc.ClientEnd, make_end func(string) *labrpc.Client
 func (ck *Clerk) Get(key string) string {
 	args := GetArgs{}
 	args.Key = key
+	args.Op = GET
+	ck.mu.Lock()
+	thisCmdId := ck.cmdId
+	ck.cmdId += 1
+	args.ClientId = ck.clientId
+	args.CmdId = thisCmdId
+	ck.mu.Unlock()
 
 	for {
 		shard := key2shard(key)
 		gid := ck.config.Shards[shard]
+		args.Gid = gid
 		if servers, ok := ck.config.Groups[gid]; ok {
 			// try each server for the shard.
 			for si := 0; si < len(servers); si++ {
