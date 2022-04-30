@@ -121,10 +121,17 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	args.Key = key
 	args.Value = value
 	args.Op = op
+	ck.mu.Lock()
+	thisCmdId := ck.cmdId
+	ck.cmdId += 1
+	args.ClientId = ck.clientId
+	args.CmdId = thisCmdId
+	ck.mu.Unlock()
 
 	for {
 		shard := key2shard(key)
 		gid := ck.config.Shards[shard]
+		args.Gid = gid
 		if servers, ok := ck.config.Groups[gid]; ok {
 			for si := 0; si < len(servers); si++ {
 				srv := ck.make_end(servers[si])
