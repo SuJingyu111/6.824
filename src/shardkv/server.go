@@ -2,6 +2,7 @@ package shardkv
 
 import (
 	"6.824/labrpc"
+	"6.824/shardctrler"
 	"bytes"
 	"log"
 	"sync/atomic"
@@ -65,6 +66,9 @@ type ShardKV struct {
 	kvStorage       map[string]string
 	clientCmdIdMap  map[int64]int64
 	finishedOpChans map[int]chan OpResult
+
+	//Fields for 4B
+	config shardctrler.Config //lastest config
 }
 
 func (kv *ShardKV) registerChanAtIdx(index int) chan OpResult {
