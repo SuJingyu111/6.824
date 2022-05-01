@@ -86,6 +86,12 @@ func (kv *ShardKV) registerChanAtIdx(index int) chan OpResult {
 
 func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) {
 	// Your code here.
+	shardId := key2shard(args.Key)
+	if !kv.hasShard(shardId) {
+		DPrintf("SERVER_GET: ErrWrongGroup at beginning: GET op with CmdId %v and key %v from client %v", args.CmdId, args.Key, args.ClientId)
+		reply.Err = ErrWrongGroup
+		return
+	}
 	op := Op{
 		Type:     args.Op,
 		Key:      args.Key,
@@ -135,6 +141,12 @@ func (kv *ShardKV) deleteChanAtIdx(index int) {
 
 func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	// Your code here.
+	shardId := key2shard(args.Key)
+	if !kv.hasShard(shardId) {
+		DPrintf("SERVER_PUT_APPEND: ErrWrongGroup at beginning: Server receives %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
+		reply.Err = ErrWrongGroup
+		return
+	}
 	op := Op{
 		Type:     args.Op,
 		Key:      args.Key,
@@ -270,7 +282,7 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 		}
 	}
 
-	kv.readSnapshot(kv.rf.GetSnapshot())
+	//kv.readSnapshot(kv.rf.GetSnapshot())
 	DPrintf("Initial kvStorage: %v", kv.shards)
 
 	go kv.applier()
@@ -355,22 +367,34 @@ func (kv *ShardKV) applier() {
 func (kv *ShardKV) readSnapshot(snapshot []byte) {
 	r := bytes.NewBuffer(snapshot)
 	d := labgob.NewDecoder(r)
-	var newkvStorage map[string]string
-	var newclientCmdIdMap map[int64]int64
-	if d.Decode(&newkvStorage) != nil || d.Decode(&newclientCmdIdMap) != nil {
-		DPrintf("READ_SNAP_SHOT: read persist went wrong!")
-	} else {
-		DPrintf("READ_SNAP_SHOT: read persist successful!")
-		kv.kvStorage = newkvStorage
-		kv.clientCmdIdMap = newclientCmdIdMap
+	var shardNum int
+	d.Decode(&shardNum)
+	for i := 0; i < shardNum; i++ {
+		newShard := Shard{}
+		var index int
+		var newkvStorage map[string]string
+		var newclientCmdIdMap map[int64]int64
+		if d.Decode(index) != nil || d.Decode(&newkvStorage) != nil || d.Decode(&newclientCmdIdMap) != nil {
+			DPrintf("READ_SNAP_SHOT: read persist went wrong!")
+		} else {
+			DPrintf("READ_SNAP_SHOT: read persist successful!")
+			newShard.index = index
+			newShard.kvStorage = newkvStorage
+			newShard.clientCmdIdMap = newclientCmdIdMap
+		}
+		kv.shards[index] = &newShard
 	}
 }
 
 func (kv *ShardKV) takeSnapshot() []byte {
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
-	e.Encode(kv.kvStorage)
-	e.Encode(kv.clientCmdIdMap)
+	e.Encode(len(kv.shards))
+	for _, shard := range kv.shards {
+		e.Encode(shard.index)
+		e.Encode(shard.kvStorage)
+		e.Encode(shard.clientCmdIdMap)
+	}
 	return w.Bytes()
 }
 
@@ -413,4 +437,9 @@ func (kv *ShardKV) apply(op *Op, opResult *OpResult) {
 	} else {
 		DPrintf("KV.APPLY: UNKNOWN OPERATION: %v", op.Type)
 	}
+}
+
+func (kv *ShardKV) hasShard(shardId int) bool {
+	_, ok := kv.shards[shardId]
+	return ok
 }
