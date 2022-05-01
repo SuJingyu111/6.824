@@ -29,7 +29,7 @@ type PutAppendArgs struct {
 	// otherwise RPC will break.
 	ClientId int64
 	CmdId    int64
-	Gid      int
+	ShardIdx int
 }
 
 type PutAppendReply struct {
@@ -41,7 +41,7 @@ type GetArgs struct {
 	// You'll have to add definitions here.
 	ClientId int64
 	CmdId    int64
-	Gid      int
+	ShardIdx int
 	Op       string
 }
 
