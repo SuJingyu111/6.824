@@ -28,6 +28,11 @@ const (
 	APPEND string = "Append"
 )
 
+//Timeout constants
+const (
+	PULL_CONFIG_TMO = 100 //Pull config from shardctrler every 100ms
+)
+
 type Op struct {
 	// Your definitions here.
 	// Field names must start with capital letters,
