@@ -53,3 +53,7 @@ type Shard struct {
 	kvStorage      map[string]string
 	clientCmdIdMap map[int64]int64
 }
+
+func (shard *Shard) updateClientCmdIdMap(clientId int64, cmdId int64) {
+	shard.clientCmdIdMap[clientId] = cmdId
+}

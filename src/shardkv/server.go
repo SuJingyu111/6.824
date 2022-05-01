@@ -163,7 +163,7 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 				kv.rf.Snapshot(index, kv.takeSnapshot())
 			}
 			kv.mu.Unlock()
-			reply.Err = OK
+			reply.Err = opResult.Err
 		} else {
 			DPrintf("SERVER_PUT_APPEND: ErrWrongLeader: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
 			reply.Err = ErrWrongLeader
@@ -284,17 +284,24 @@ func (kv *ShardKV) checkAndApply(op *Op) OpResult {
 		ClientId: op.ClientId,
 		CmdId:    op.CmdId,
 	}
-	if kv.checkOpUpToDate(op) {
+	shard := key2shard(op.Key)
+	if kv.checkOpUpToDate(op, shard) {
 		kv.apply(op, &opResult)
-		kv.clientCmdIdMap[op.ClientId] = op.CmdId
+		kv.shards[shard].updateClientCmdIdMap(op.ClientId, op.CmdId)
 	} else if op.Type == GET {
-		kv.apply(op, &opResult)
+		if _, ok := kv.shards[shard].clientCmdIdMap[op.ClientId]; ok {
+			kv.apply(op, &opResult)
+		} else {
+			opResult.Err = ErrWrongGroup
+		}
+	} else {
+		opResult.Err = OK
 	}
 	return opResult
 }
 
-func (kv *ShardKV) checkOpUpToDate(op *Op) bool {
-	lastCmdId, ok := kv.clientCmdIdMap[op.ClientId]
+func (kv *ShardKV) checkOpUpToDate(op *Op, shard int) bool {
+	lastCmdId, ok := kv.shards[shard].clientCmdIdMap[op.ClientId]
 	return !ok || lastCmdId < op.CmdId
 }
 
