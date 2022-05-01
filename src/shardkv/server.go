@@ -68,12 +68,12 @@ type ShardKV struct {
 	// Your definitions here.
 	lastApplied int //last applied index, for log compaction
 
-	kvStorage       map[string]string
-	clientCmdIdMap  map[int64]int64
+	shards          map[int]Shard //shard index -> shard
 	finishedOpChans map[int]chan OpResult
 
-	//Fields for 4B
-	config shardctrler.Config //lastest config
+	//Fields for 4B control
+	config          shardctrler.Config //lastest config
+	ctrlerInterface *shardctrler.Clerk
 }
 
 func (kv *ShardKV) registerChanAtIdx(index int) chan OpResult {
@@ -248,14 +248,19 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 	kv.applyCh = make(chan raft.ApplyMsg)
 	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
 
-	kv.kvStorage = make(map[string]string)
-	kv.clientCmdIdMap = make(map[int64]int64)
+	kv.shards = make(map[int]Shard)
 	kv.finishedOpChans = make(map[int]chan OpResult)
 
 	kv.lastApplied = -1
 
 	kv.readSnapshot(kv.rf.GetSnapshot())
-	DPrintf("Initial kvStorage: %v", kv.kvStorage)
+	DPrintf("Initial kvStorage: %v", kv.shards)
+
+	//For 4B
+	kv.ctrlerInterface = shardctrler.MakeClerk(kv.ctrlers)
+	kv.config = kv.ctrlerInterface.Query(-1)
+	//TODO: INIT SHARDS ACCORDING TO CONFIG
+	//TODO: MAKE CODE WORK WITH SHARDS
 
 	go kv.applier()
 
