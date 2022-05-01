@@ -375,21 +375,41 @@ func (kv *ShardKV) takeSnapshot() []byte {
 }
 
 func (kv *ShardKV) apply(op *Op, opResult *OpResult) {
+	shardId := key2shard(op.Key)
 	if op.Type == GET {
-		value, ok := kv.kvStorage[op.Key]
-		if !ok {
+		shard, hasShard := kv.shards[shardId]
+		if !hasShard {
 			opResult.Value = ""
-			opResult.Err = ErrNoKey
+			opResult.Err = ErrWrongGroup
 		} else {
-			opResult.Value = value
+			value, ok := shard.kvStorage[op.Key]
+			if !ok {
+				opResult.Value = ""
+				opResult.Err = ErrNoKey
+			} else {
+				opResult.Value = value
+				opResult.Err = OK
+			}
+		}
+
+	} else if op.Type == PUT {
+		shard, hasShard := kv.shards[shardId]
+		if !hasShard {
+			opResult.Value = ""
+			opResult.Err = ErrWrongGroup
+		} else {
+			shard.kvStorage[op.Key] = op.Value
 			opResult.Err = OK
 		}
-	} else if op.Type == PUT {
-		kv.kvStorage[op.Key] = op.Value
-		opResult.Err = OK
 	} else if op.Type == APPEND {
-		kv.kvStorage[op.Key] += op.Value
-		opResult.Err = OK
+		shard, hasShard := kv.shards[shardId]
+		if !hasShard {
+			opResult.Value = ""
+			opResult.Err = ErrWrongGroup
+		} else {
+			shard.kvStorage[op.Key] += op.Value
+			opResult.Err = OK
+		}
 	} else {
 		DPrintf("KV.APPLY: UNKNOWN OPERATION: %v", op.Type)
 	}
