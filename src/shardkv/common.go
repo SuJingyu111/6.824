@@ -49,3 +49,9 @@ type GetReply struct {
 	Err   Err
 	Value string
 }
+
+type Shard struct {
+	index          int
+	kvStorage      map[string]string
+	clientCmdIdMap map[int64]int64
+}
