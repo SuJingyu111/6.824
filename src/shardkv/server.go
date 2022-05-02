@@ -12,7 +12,7 @@ import "6.824/raft"
 import "sync"
 import "6.824/labgob"
 
-const Debug = false
+const Debug = true
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug {
@@ -269,6 +269,8 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 	kv.ctrlerInterface = shardctrler.MakeClerk(kv.ctrlers)
 	kv.config = kv.ctrlerInterface.Query(-1)
 
+	DPrintf("MAKE_SERVER: config.shards: %v", kv.config.Shards)
+
 	//TODO: MAKE CODE WORK WITH SHARDS
 	//INIT SHARDS ACCORDING TO CONFIG
 	for shardIdx, gid := range kv.config.Shards {
@@ -440,6 +442,8 @@ func (kv *ShardKV) apply(op *Op, opResult *OpResult) {
 }
 
 func (kv *ShardKV) hasShard(shardId int) bool {
+	kv.mu.Lock()
 	_, ok := kv.shards[shardId]
+	kv.mu.Unlock()
 	return ok
 }
