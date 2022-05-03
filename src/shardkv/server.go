@@ -30,7 +30,7 @@ const (
 
 //Timeout constants
 const (
-	PULL_CONFIG_TMO = 100 //Pull config from shardctrler every 100ms
+	PULL_CONFIG_TMO = 50 //Pull config from shardctrler every 50ms
 )
 
 type Op struct {
@@ -44,6 +44,13 @@ type Op struct {
 	//Dup elimination
 	ClientId int64
 	CmdId    int64
+
+	//Install new config:
+	NewConfig shardctrler.Config
+
+	//Migration of shards:
+	ShardsToMove []Shard
+	ConfigIdx    int //Num of config that caused the migration
 }
 
 type OpResult struct {
