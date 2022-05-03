@@ -11,6 +11,7 @@ package shardkv
 import (
 	"6.824/labrpc"
 	"sync"
+	"sync/atomic"
 )
 import "crypto/rand"
 import "math/big"
@@ -75,17 +76,15 @@ func MakeClerk(ctrlers []*labrpc.ClientEnd, make_end func(string) *labrpc.Client
 // You will have to modify this function.
 //
 func (ck *Clerk) Get(key string) string {
-	args := GetArgs{}
-	args.Key = key
-	args.Op = GET
-	ck.mu.Lock()
-	thisCmdId := ck.cmdId
-	ck.cmdId += 1
-	args.ClientId = ck.clientId
-	args.CmdId = thisCmdId
-	ck.mu.Unlock()
-
+	atomic.AddInt64(&ck.cmdId, 1)
+	args := GetArgs{
+		Key:      key,
+		ClientId: ck.clientId,
+		CmdId:    ck.cmdId,
+		Op:       GET,
+	}
 	for {
+		args.ConfigIdx = ck.config.Num
 		shard := key2shard(key)
 		gid := ck.config.Shards[shard]
 		if servers, ok := ck.config.Groups[gid]; ok {
@@ -116,18 +115,16 @@ func (ck *Clerk) Get(key string) string {
 // You will have to modify this function.
 //
 func (ck *Clerk) PutAppend(key string, value string, op string) {
-	args := PutAppendArgs{}
-	args.Key = key
-	args.Value = value
-	args.Op = op
-	ck.mu.Lock()
-	thisCmdId := ck.cmdId
-	ck.cmdId += 1
-	args.ClientId = ck.clientId
-	args.CmdId = thisCmdId
-	ck.mu.Unlock()
-
+	atomic.AddInt64(&ck.cmdId, 1)
+	args := PutAppendArgs{
+		Key:      key,
+		Value:    value,
+		Op:       op,
+		ClientId: ck.clientId,
+		CmdId:    ck.cmdId,
+	}
 	for {
+		args.ConfigIdx = ck.config.Num
 		shard := key2shard(key)
 		gid := ck.config.Shards[shard]
 		if servers, ok := ck.config.Groups[gid]; ok {
@@ -151,8 +148,8 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 }
 
 func (ck *Clerk) Put(key string, value string) {
-	ck.PutAppend(key, value, "Put")
+	ck.PutAppend(key, value, PUT)
 }
 func (ck *Clerk) Append(key string, value string) {
-	ck.PutAppend(key, value, "Append")
+	ck.PutAppend(key, value, APPEND)
 }
