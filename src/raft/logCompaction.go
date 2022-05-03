@@ -77,7 +77,11 @@ func (rf *Raft) trimLog(index int) {
 	DPrintf("TRIM: Log content of server %v before trim up to index %v: %v", rf.me, index, rf.log)
 	DPrintf("TRIM: lastLogIndexNotIncluded: %v, index: %v, on-the-fly log length: %v", rf.lastLogTermNotIncluded, index, rf.getLogLengthNotInSnapshot())
 	DPrintf("TRIM: last real index: %v", rf.getLogIdxOfLogicalIdx(index))
-	rf.lastLogTermNotIncluded = rf.log[rf.getLogIdxOfLogicalIdx(index)].Term
+	realIdx := rf.getLogIdxOfLogicalIdx(index)
+	if realIdx >= len(rf.log) {
+		return
+	}
+	rf.lastLogTermNotIncluded = rf.log[realIdx].Term
 	newLog := make([]LogEtry, rf.getLastLogIndex()-index)
 	copy(newLog, rf.log[rf.getLogIdxOfLogicalIdx(index+1):])
 	DPrintf("TRIM: new log: %v, supposed content: %v", newLog, rf.log[rf.getLogIdxOfLogicalIdx(index+1):])
