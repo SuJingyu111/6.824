@@ -23,9 +23,11 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 
 //Operation types
 const (
-	GET    string = "Get"
-	PUT    string = "Put"
-	APPEND string = "Append"
+	GET            string = "Get"
+	PUT            string = "Put"
+	APPEND         string = "Append"
+	INSTALL_CONFIG string = "Install"
+	Migrate        string = "Migrate"
 )
 
 //Timeout constants
@@ -50,7 +52,8 @@ type Op struct {
 
 	//Migration of shards:
 	ShardsToMove []Shard
-	ConfigIdx    int //Num of config that caused the migration
+
+	ConfigIdx int //Num of config of this Op, check for stale op
 }
 
 type OpResult struct {
