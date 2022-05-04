@@ -273,31 +273,22 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 	kv.shards = make(map[int]*Shard)
 	kv.finishedOpChans = make(map[int]chan OpResult)
 
-	kv.lastApplied = -1
+	kv.lastApplied = 0
 
 	//For 4B
 	kv.ctrlerInterface = shardctrler.MakeClerk(kv.ctrlers)
-	kv.config = kv.ctrlerInterface.Query(-1)
+	//UPDATE CONFIG IN A GOROUTINE
 
 	DPrintf("MAKE_SERVER: config.shards: %v", kv.config.Shards)
 
 	//TODO: MAKE CODE WORK WITH SHARDS
-	//INIT SHARDS ACCORDING TO CONFIG
-	for shardIdx, gid := range kv.config.Shards {
-		if gid == kv.gid {
-			shard := Shard{
-				index:          shardIdx,
-				kvStorage:      make(map[string]string),
-				clientCmdIdMap: make(map[int64]int64),
-			}
-			kv.shards[shardIdx] = &shard
-		}
-	}
 
-	//kv.readSnapshot(kv.rf.GetSnapshot())
+	kv.readSnapshot(kv.rf.GetSnapshot())
 	DPrintf("Initial kvStorage: %v", kv.shards)
 
 	go kv.applier()
+
+	go kv.pullLatestConfig()
 
 	return kv
 }
