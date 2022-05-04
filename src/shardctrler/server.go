@@ -123,7 +123,7 @@ func (sc *ShardCtrler) Join(args *JoinArgs, reply *JoinReply) {
 		DPrintf("SERVER_ERR_TIMEOUT: OK: CmdId %v from client %v", args.CmdId, args.ClientId)
 		reply.WrongLeader = true
 	}
-	go sc.deleteChanAtIdx(index)
+	sc.deleteChanAtIdx(index)
 }
 
 func (sc *ShardCtrler) Leave(args *LeaveArgs, reply *LeaveReply) {
@@ -158,7 +158,7 @@ func (sc *ShardCtrler) Leave(args *LeaveArgs, reply *LeaveReply) {
 		//DPrintf("SERVER_PUT_APPEND: ErrWrongLeader from TIMEOUT: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
 		reply.WrongLeader = true
 	}
-	go sc.deleteChanAtIdx(index)
+	sc.deleteChanAtIdx(index)
 }
 
 func (sc *ShardCtrler) Move(args *MoveArgs, reply *MoveReply) {
@@ -194,7 +194,7 @@ func (sc *ShardCtrler) Move(args *MoveArgs, reply *MoveReply) {
 		//DPrintf("SERVER_PUT_APPEND: ErrWrongLeader from TIMEOUT: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
 		reply.WrongLeader = true
 	}
-	go sc.deleteChanAtIdx(index)
+	sc.deleteChanAtIdx(index)
 }
 
 func (sc *ShardCtrler) Query(args *QueryArgs, reply *QueryReply) {
@@ -230,7 +230,7 @@ func (sc *ShardCtrler) Query(args *QueryArgs, reply *QueryReply) {
 		//DPrintf("SERVER_PUT_APPEND: ErrWrongLeader from TIMEOUT: %v op with CmdId %v and key %v, value %v, from client %v", args.Op, args.CmdId, args.Key, args.Value, args.ClientId)
 		reply.WrongLeader = true
 	}
-	go sc.deleteChanAtIdx(index)
+	sc.deleteChanAtIdx(index)
 }
 
 //
