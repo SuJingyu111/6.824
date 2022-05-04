@@ -273,7 +273,7 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister)
 	sc.rf = raft.Make(servers, me, persister, sc.applyCh)
 
 	// Your code here.
-	sc.lastApplied = -1
+	sc.lastApplied = 0
 	sc.clientCmdIdMap = make(map[int64]int64)
 	sc.configs = make([]Config, 1)
 	sc.configs[0].Groups = map[int][]string{}
